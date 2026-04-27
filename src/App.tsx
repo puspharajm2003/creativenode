@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedAdmin } from "@/components/ProtectedAdmin";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import Landing from "./pages/Landing.tsx";
 import Deck from "./pages/Index.tsx";
 import Clients from "./pages/Clients.tsx";
@@ -22,6 +23,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <AnalyticsTracker />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/portfolio" element={<Deck />} />

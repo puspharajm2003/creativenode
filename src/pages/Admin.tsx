@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   LogOut, Upload, Trash2, Loader2, Plus, ImagePlus, ExternalLink,
-  Eye, EyeOff, GripVertical, MessageSquare, Receipt,
+  Eye, EyeOff, GripVertical, MessageSquare, Receipt, LayoutGrid, Activity,
   X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import { Billing } from "@/components/admin/Billing";
+import { Analytics } from "@/components/admin/Analytics";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, DragEndEvent,
@@ -47,7 +48,7 @@ const Admin = () => {
   const [posters, setPosters] = useState<Poster[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [activeId, setActiveId] = useState<string>("");
-  const [tab, setTab] = useState<"clients" | "websites" | "messages" | "billing">("clients");
+  const [tab, setTab] = useState<"analytics" | "clients" | "websites" | "messages" | "billing">("analytics");
   const [uploading, setUploading] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | undefined>(undefined);
@@ -210,7 +211,7 @@ const Admin = () => {
 
       {/* Tabs */}
       <div className="border-b border-gold/15 bg-ink-soft/40 px-6 flex gap-2">
-        {(["clients", "websites", "messages", "billing"] as const).map((t) => (
+        {(["analytics", "clients", "websites", "messages", "billing"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -218,6 +219,7 @@ const Admin = () => {
               tab === t ? "border-gold text-gold" : "border-transparent text-cream/60 hover:text-cream"
             }`}
           >
+            {t === "analytics" && <Activity className="w-3.5 h-3.5" />}
             {t === "messages" && <MessageSquare className="w-3.5 h-3.5" />}
             {t === "billing" && <Receipt className="w-3.5 h-3.5" />}
             {t === "websites" && <LayoutGrid className="w-3.5 h-3.5" />}
@@ -229,7 +231,9 @@ const Admin = () => {
         ))}
       </div>
 
-      {tab === "billing" ? (
+      {tab === "analytics" ? (
+        <Analytics />
+      ) : tab === "billing" ? (
         <Billing />
       ) : tab === "clients" ? (
         <div className="flex min-h-[calc(100vh-7rem)]">
