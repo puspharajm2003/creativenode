@@ -11,6 +11,7 @@ export const Slide10Contact = () => {
   const [posterSize, setPosterSize] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [lastSummary, setLastSummary] = useState<any>(null);
 
   const whatsappNumber = "916369278905";
   
@@ -18,11 +19,25 @@ export const Slide10Contact = () => {
     e.preventDefault();
     setLoading(true);
 
-    const generatedMessage = `Hi Creativenode,\n\nI'm ${name} from ${businessType}. I'm interested in your design services for ${posterSize} posters.\n\nCould you please share your portfolio and pricing details?`;
+    let recommendedPlan = "Standard Poster";
+    let postersCount = "24 Posters / Month";
+    let totalPrice = "₹9,999";
 
-    // 1. Send to CRM
+    const lowerSize = posterSize.toLowerCase();
+    if (lowerSize.includes("single") || lowerSize.includes("1") || lowerSize.includes("one")) {
+      recommendedPlan = "Frame Poster";
+      postersCount = "1 Poster";
+      totalPrice = "₹149";
+    } else if (lowerSize.includes("week") || lowerSize.includes("5") || lowerSize.includes("few")) {
+      recommendedPlan = "Basic Poster";
+      postersCount = "5 Posters / Week";
+      totalPrice = "₹1,999";
+    }
+
+    const crmMessage = `Business Type: ${businessType}\nPoster Size: ${posterSize}\n\nRecommended Plan: ${recommendedPlan}\nPosters: ${postersCount}\nTotal Price: ${totalPrice}\n\nMessage: Hi Creativenode, I'm interested in your design services.`;
+
     const { error } = await supabase.from("contact_messages").insert([
-      { name: name, email: "whatsapp-lead@creativenode.in", message: generatedMessage }
+      { name: name, email: "whatsapp-lead@creativenode.in", message: crmMessage }
     ]);
     
     setLoading(false);
@@ -32,10 +47,11 @@ export const Slide10Contact = () => {
       return;
     }
 
+    const waText = encodeURIComponent(`Hi Creativenode! I'm ${name} (${businessType}). I'm looking for ${posterSize} and saw the ${recommendedPlan} (${totalPrice}).`);
+    window.open(`https://wa.me/916369278905?text=${waText}`, "_blank");
+
+    setLastSummary({ recommendedPlan, postersCount, totalPrice });
     setDone(true);
-    
-    // 2. Open WhatsApp without asking (using web.whatsapp to potentially bypass api.whatsapp blocks)
-    window.open(`https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(generatedMessage)}`, "_blank");
   };
 
   return (
@@ -61,16 +77,41 @@ export const Slide10Contact = () => {
           <h2 className="font-display font-black text-[100px] leading-[0.9] mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cream via-cream to-cream/50">
             Start <span className="italic font-serif-elegant gold-text">Today.</span>
           </h2>
-          <p className="font-serif-elegant italic text-cream/60 text-2xl mb-12">
+          <p className="font-serif-elegant italic text-cream/60 text-2xl mb-8">
             Fill in the quick details below. We'll add you to our CRM and open WhatsApp instantly.
           </p>
+
+          <button 
+            onClick={() => window.print()}
+            className="mb-12 px-8 py-3 bg-gold/10 border border-gold/40 text-gold hover:bg-gold hover:text-ink rounded shadow-[0_0_15px_hsl(var(--gold)/0.2)] hover:shadow-[0_0_25px_hsl(var(--gold)/0.4)] transition no-print font-display tracking-widest text-sm flex items-center gap-2"
+          >
+            DOWNLOAD LATEST PITCH DECK (PDF)
+          </button>
 
           {done ? (
              <div className="flex flex-col items-center p-12 bg-ink/60 border border-gold/30 rounded-2xl backdrop-blur-md w-full">
                <CheckCircle2 className="w-16 h-16 text-gold mb-6" />
                <h3 className="font-display text-3xl font-bold text-cream mb-2">Request Sent!</h3>
-               <p className="text-cream/70 font-serif-elegant italic text-xl">
-                 Your details are in our CRM. If WhatsApp didn't open automatically, <a href={`https://wa.me/${whatsappNumber}`} target="_blank" className="text-gold underline">click here</a>.
+               <p className="text-cream/70 font-serif-elegant italic text-xl mb-8">
+                 Your details are in our CRM and we've opened WhatsApp.
+               </p>
+
+               {lastSummary && (
+                 <div className="bg-ink border border-gold/20 rounded-xl p-6 w-full max-w-md mb-8 relative overflow-hidden text-left">
+                   <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 blur-3xl pointer-events-none" />
+                   <h4 className="font-display text-gold text-sm tracking-widest mb-4 uppercase flex items-center gap-2">
+                     <CheckCircle2 className="w-4 h-4" /> Recommended Plan
+                   </h4>
+                   <div className="flex justify-between items-end mb-2 relative z-10">
+                     <div className="text-cream font-bold text-4xl">{lastSummary.totalPrice}</div>
+                     <div className="text-cream/50 text-xs uppercase font-display tracking-wider bg-gold/10 px-3 py-1.5 rounded border border-gold/20">{lastSummary.postersCount}</div>
+                   </div>
+                   <div className="text-cream font-display mt-2 relative z-10">{lastSummary.recommendedPlan}</div>
+                 </div>
+               )}
+
+               <p className="text-cream/50 text-sm">
+                 If WhatsApp didn't open automatically, <a href={`https://wa.me/${whatsappNumber}`} target="_blank" className="text-gold underline">click here</a>.
                </p>
              </div>
           ) : (
@@ -114,7 +155,9 @@ export const Slide10Contact = () => {
                 className="group relative w-full mt-6 px-10 py-6 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display font-black text-2xl tracking-[0.2em] rounded-xl shadow-[0_15px_40px_-10px_hsl(42_65%_50%_/_0.5)] hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.7)] hover:-translate-y-1 transition-all flex items-center justify-center gap-4 overflow-hidden disabled:opacity-70 disabled:hover:translate-y-0"
               >
                 <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                {loading ? <Loader2 className="w-8 h-8 animate-spin" /> : (
+                {loading ? (
+                  <><Loader2 className="w-8 h-8 animate-spin" /> SAVED TO CRM & OPENING WHATSAPP...</>
+                ) : (
                   <>START YOUR DESIGN TODAY <ArrowRight className="w-8 h-8 group-hover:translate-x-2 transition-transform" /></>
                 )}
               </button>

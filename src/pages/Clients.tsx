@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthNavButton } from "@/components/AuthNavButton";
 import { ArrowDown, ArrowUpRight, Download, Loader2, Instagram } from "lucide-react";
 import { toast } from "sonner";
 
@@ -214,44 +215,57 @@ const Clients = () => {
 
       // Per-client horizontal reels
       const reels = gsap.utils.toArray<HTMLElement>(".reel");
-      reels.forEach((reel) => {
-        const track = reel.querySelector<HTMLElement>(".reel-track");
-        if (!track) return;
-        const distance = () => track.scrollWidth - reel.clientWidth + 80;
-        const tween = gsap.to(track, {
-          x: () => -distance(),
-          ease: "none",
-          scrollTrigger: {
-            trigger: reel,
-            start: "top top",
-            end: () => `+=${distance()}`,
-            pin: true,
-            scrub: 1,
-            invalidateOnRefresh: true,
-          },
+      
+      let mm = gsap.matchMedia();
+      mm.add("(min-width: 768px)", () => {
+        reels.forEach((reel) => {
+          const track = reel.querySelector<HTMLElement>(".reel-track");
+          if (!track) return;
+          const distance = () => track.scrollWidth - reel.clientWidth + 80;
+          const tween = gsap.to(track, {
+            x: () => -distance(),
+            ease: "none",
+            scrollTrigger: {
+              trigger: reel,
+              start: "top top",
+              end: () => `+=${distance()}`,
+              pin: true,
+              scrub: 1,
+              invalidateOnRefresh: true,
+            },
+          });
+          // Parallax inside cards
+          gsap.utils.toArray<HTMLElement>(".reel-card", reel).forEach((card) => {
+            const img = card.querySelector<HTMLElement>("img");
+            if (img) {
+              gsap.fromTo(img,
+                { yPercent: 6 },
+                {
+                  yPercent: -6, ease: "none",
+                  scrollTrigger: {
+                    trigger: card,
+                    containerAnimation: tween,
+                    start: "left right",
+                    end: "right left",
+                    scrub: true,
+                  },
+                }
+              );
+            }
+          });
+          gsap.from(reel.querySelectorAll(".reel-card"), {
+            opacity: 0, y: 60, duration: 0.8, ease: "power3.out", stagger: 0.05,
+            scrollTrigger: { trigger: reel, start: "top 80%" },
+          });
         });
-        // Parallax inside cards (uses the horizontal tween as containerAnimation)
-        gsap.utils.toArray<HTMLElement>(".reel-card", reel).forEach((card) => {
-          const img = card.querySelector<HTMLElement>("img");
-          if (img) {
-            gsap.fromTo(img,
-              { yPercent: 6 },
-              {
-                yPercent: -6, ease: "none",
-                scrollTrigger: {
-                  trigger: card,
-                  containerAnimation: tween,
-                  start: "left right",
-                  end: "right left",
-                  scrub: true,
-                },
-              }
-            );
-          }
-        });
-        gsap.from(reel.querySelectorAll(".reel-card"), {
-          opacity: 0, y: 60, duration: 0.8, ease: "power3.out", stagger: 0.05,
-          scrollTrigger: { trigger: reel, start: "top 80%" },
+      });
+
+      mm.add("(max-width: 767px)", () => {
+        reels.forEach((reel) => {
+          gsap.from(reel.querySelectorAll(".reel-card"), {
+            opacity: 0, x: 40, duration: 0.8, ease: "power3.out", stagger: 0.1,
+            scrollTrigger: { trigger: reel, start: "top 80%" },
+          });
         });
       });
 
@@ -296,7 +310,7 @@ const Clients = () => {
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               EXPORT GALLERY
             </button>
-            <Link to="/login" className="hover:text-gold transition">ADMIN</Link>
+            <AuthNavButton className="hover:text-gold transition" />
           </div>
         </div>
       </nav>
@@ -361,7 +375,7 @@ const Clients = () => {
       {clients.map((client, idx) => {
         const list = posters.filter((p) => p.client_id === client.id);
         return (
-          <section key={client.id} className="reel relative h-screen overflow-hidden" id={`reel-${client.slug}`}>
+          <section key={client.id} className="reel relative h-[100dvh] md:h-screen overflow-hidden flex flex-col justify-center md:block" id={`reel-${client.slug}`}>
             <div className="absolute inset-0 bg-gradient-to-b from-ink via-ink-soft/40 to-ink" />
             <div className="grain" />
 
@@ -372,29 +386,29 @@ const Clients = () => {
               </div>
             </div>
 
-            <div className="relative z-10 h-full flex items-center pl-24 pr-12">
+            <div className="relative z-10 h-full flex flex-col md:flex-row items-center md:pl-24 md:pr-12 pt-28 md:pt-0">
               {/* Title block */}
-              <div className="section-title shrink-0 w-[440px] pr-12 border-r border-gold/15 flex flex-col justify-center">
-                <div className="text-xs font-display tracking-[0.4em] text-gold mb-4">FEATURED WORK</div>
-                <h2 className="font-display font-black leading-[0.9] text-[clamp(48px,5.5vw,84px)]" style={{ color: client.accent ?? undefined }}>
+              <div className="section-title shrink-0 w-full md:w-[440px] px-8 md:px-0 md:pr-12 md:border-r border-gold/15 flex flex-col justify-center items-center md:items-start text-center md:text-left mb-6 md:mb-0">
+                <div className="text-[10px] md:text-xs font-display tracking-[0.4em] text-gold mb-3 md:mb-4">FEATURED WORK</div>
+                <h2 className="font-display font-black leading-[0.9] text-[clamp(40px,10vw,84px)]" style={{ color: client.accent ?? undefined }}>
                   {client.name}
                 </h2>
-                <p className="font-serif-elegant italic text-cream/70 text-xl mt-4">{client.tagline}</p>
-                <div className="hairline mt-8 w-32" />
-                <div className="mt-6 text-xs font-display tracking-[0.3em] text-cream/50 mb-8">
+                <p className="font-serif-elegant italic text-cream/70 text-sm md:text-xl mt-3 md:mt-4 max-w-[280px] md:max-w-none mx-auto md:mx-0">{client.tagline}</p>
+                <div className="hairline mt-6 md:mt-8 w-24 md:w-32" />
+                <div className="mt-4 md:mt-6 text-[10px] md:text-xs font-display tracking-[0.3em] text-cream/50 mb-6 md:mb-8">
                   {list.length} {list.length === 1 ? "WORK" : "WORKS"}
                 </div>
 
                 {/* Social / Custom Links */}
                 {(client.instagram_url || (list.length > 2 && client.custom_link_url)) && (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col md:flex-col flex-row gap-3">
                     {client.instagram_url && (
-                      <a href={client.instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-3 border border-gold/30 text-cream/80 text-xs font-display tracking-widest hover:border-gold hover:text-gold rounded transition w-fit">
-                        <Instagram className="w-3.5 h-3.5" /> FOLLOW ON INSTAGRAM
+                      <a href={client.instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 border border-gold/30 text-cream/80 text-[10px] md:text-xs font-display tracking-widest hover:border-gold hover:text-gold rounded transition w-fit">
+                        <Instagram className="w-3.5 h-3.5" /> FOLLOW <span className="hidden md:inline">ON INSTAGRAM</span>
                       </a>
                     )}
                     {(list.length > 2 && client.custom_link_url && client.custom_link_text) && (
-                      <a href={client.custom_link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold text-xs font-display tracking-widest rounded hover:opacity-90 transition w-fit">
+                      <a href={client.custom_link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold text-[10px] md:text-xs font-display tracking-widest rounded hover:opacity-90 transition w-fit">
                         {client.custom_link_text.toUpperCase()} <ArrowUpRight className="w-3.5 h-3.5" />
                       </a>
                     )}
@@ -403,40 +417,40 @@ const Clients = () => {
               </div>
 
               {/* Horizontal reel */}
-              <div className="reel-track flex items-center gap-8 pl-12 pr-32 will-change-transform">
+              <div className="reel-track flex items-center gap-4 md:gap-8 px-6 md:pl-12 md:pr-32 w-full md:w-auto overflow-x-auto md:overflow-visible snap-x snap-mandatory no-scrollbar will-change-transform pb-8 md:pb-0">
                 {list.length === 0 ? (
-                  <div className="reel-card w-[420px] aspect-[4/5] poster-card flex items-center justify-center">
+                  <div className="reel-card shrink-0 w-[260px] md:w-[420px] aspect-[4/5] poster-card flex items-center justify-center snap-center">
                     <span className="font-serif-elegant italic text-cream/40">Coming soon</span>
                   </div>
                 ) : (
                   list.map((p, i) => (
-                    <div key={p.id} className="reel-card relative shrink-0 w-[460px] aspect-[4/5] rounded-2xl overflow-hidden group border border-gold/10 hover:border-gold/40 transition-colors duration-500 shadow-2xl hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.3)]">
+                    <div key={p.id} className="reel-card relative shrink-0 w-[260px] md:w-[460px] aspect-[4/5] rounded-xl md:rounded-2xl overflow-hidden group border border-gold/10 hover:border-gold/40 transition-colors duration-500 shadow-xl md:shadow-2xl hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.3)] snap-center">
                       <img
                         src={PUBLIC_URL(p.image_path)}
                         alt={p.title ?? client.name}
-                        className="w-full h-full object-cover scale-110 group-hover:scale-105 transition-transform duration-1000 ease-out"
+                        className="w-full h-full object-cover md:scale-110 md:group-hover:scale-105 transition-transform duration-1000 ease-out"
                         loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent opacity-60 md:opacity-60 md:group-hover:opacity-80 transition-opacity" />
                       
-                      <div className="absolute top-5 left-5 z-10 px-4 py-2 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
-                        <span className="font-display tracking-[0.3em] text-gold text-[10px] font-bold">{String(i + 1).padStart(2, "0")} / {String(list.length).padStart(2, "0")}</span>
+                      <div className="absolute top-4 left-4 md:top-5 md:left-5 z-10 px-3 py-1.5 md:px-4 md:py-2 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
+                        <span className="font-display tracking-[0.3em] text-gold text-[8px] md:text-[10px] font-bold">{String(i + 1).padStart(2, "0")} / {String(list.length).padStart(2, "0")}</span>
                       </div>
                       
-                      <div className="absolute bottom-0 left-0 right-0 z-10 p-8 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                        <div className="flex items-center gap-3 text-xs font-display tracking-[0.4em] text-gold/90">
-                          <span className="px-3 py-1 bg-gold/10 border border-gold/30 rounded-full">POSTER</span>
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-5 md:p-8 md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-500">
+                        <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs font-display tracking-[0.3em] md:tracking-[0.4em] text-gold/90">
+                          <span className="px-2 py-1 md:px-3 md:bg-gold/10 border border-gold/30 rounded-full">POSTER</span>
                           <span className="opacity-50">·</span>
-                          <span className="opacity-80">{client.name.toUpperCase()}</span>
+                          <span className="opacity-80 truncate">{client.name.toUpperCase()}</span>
                         </div>
                       </div>
                     </div>
                   ))
                 )}
                 {/* End card */}
-                <div className="reel-card shrink-0 w-[300px] aspect-[4/5] flex flex-col items-center justify-center border border-dashed border-gold/30 rounded p-6 text-center">
-                  <span className="font-serif-elegant italic text-cream/50 mb-3">End of reel</span>
-                  <div className="font-display tracking-[0.4em] text-gold text-xs mb-6">{client.name.toUpperCase()}</div>
+                <div className="reel-card shrink-0 w-[220px] md:w-[300px] aspect-[4/5] flex flex-col items-center justify-center border border-dashed border-gold/30 rounded-xl p-6 text-center snap-center">
+                  <span className="font-serif-elegant italic text-cream/50 mb-2 md:mb-3 text-sm md:text-base">End of reel</span>
+                  <div className="font-display tracking-[0.4em] text-gold text-[10px] md:text-xs mb-4 md:mb-6">{client.name.toUpperCase()}</div>
                   {list.length > 2 && client.custom_link_url && client.custom_link_text && (
                     <a href={client.custom_link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 bg-gold/10 border border-gold text-gold font-bold text-[10px] font-display tracking-widest rounded hover:bg-gold hover:text-ink transition">
                       {client.custom_link_text.toUpperCase()} <ArrowUpRight className="w-3 h-3" />

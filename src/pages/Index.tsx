@@ -10,7 +10,7 @@ import { Slide07Premium } from "@/components/slides/Slide07Premium";
 import { Slide08Pricing } from "@/components/slides/Slide08Pricing";
 import { Slide09WhyUs } from "@/components/slides/Slide09WhyUs";
 import { Slide10Contact } from "@/components/slides/Slide10Contact";
-import { ChevronLeft, ChevronRight, Maximize2, LayoutGrid, X, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, LayoutGrid, X, ChevronDown, Download } from "lucide-react";
 import gsap from "gsap";
 
 const SLIDES = [
@@ -109,6 +109,16 @@ const Index = () => {
 
   return (
     <div className="h-screen w-full bg-ink text-cream flex flex-col relative overflow-hidden">
+      {/* Print Styles for PDF Export */}
+      <style>{`
+        @media print {
+          @page { size: 1920px 1080px; margin: 0; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #000; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+        }
+      `}</style>
+      
       {/* Background ambient glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vh] bg-gold/5 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
       
@@ -129,21 +139,27 @@ const Index = () => {
             </div>
           </div>
           <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-display tracking-widest text-cream/70 hover:text-gold transition-colors border border-transparent hover:border-gold/30 rounded no-print"
+          >
+            <Download className="w-4 h-4" /> PDF
+          </button>
+          <button
             onClick={() => setGridOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-display tracking-widest text-cream/70 hover:text-gold transition-colors border border-transparent hover:border-gold/30 rounded"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-display tracking-widest text-cream/70 hover:text-gold transition-colors border border-transparent hover:border-gold/30 rounded no-print"
           >
             <LayoutGrid className="w-4 h-4" /> GRID
           </button>
           <button
             onClick={enterFullscreen}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-display tracking-widest bg-gold/10 text-gold hover:bg-gold hover:text-ink border border-gold/40 transition-colors rounded shadow-[0_0_15px_hsl(var(--gold)/0.2)] hover:shadow-[0_0_25px_hsl(var(--gold)/0.4)]"
+            className="flex items-center gap-2 px-5 py-2 text-xs font-display tracking-widest bg-gold/10 text-gold hover:bg-gold hover:text-ink border border-gold/40 transition-colors rounded shadow-[0_0_15px_hsl(var(--gold)/0.2)] hover:shadow-[0_0_25px_hsl(var(--gold)/0.4)] no-print"
           >
             <Maximize2 className="w-4 h-4" /> PRESENT
           </button>
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 relative z-10">
+      <div className="flex flex-1 min-h-0 relative z-10 no-print">
         {/* Sidebar */}
         <aside ref={sidebarRef} className="w-72 border-r border-gold/10 bg-ink-soft/40 backdrop-blur-md overflow-y-auto shrink-0 gold-scroll z-20 shadow-[10px_0_30px_rgba(0,0,0,0.5)] scroll-smooth">
           <div className="p-5 space-y-4">
@@ -219,6 +235,15 @@ const Index = () => {
             </button>
           </div>
         </main>
+      </div>
+
+      {/* Hidden print container for PDF export */}
+      <div className="hidden print-only fixed top-0 left-0 w-[1920px] bg-ink z-[9999]">
+        {SLIDES.map(s => (
+          <div key={s.id} className="w-[1920px] h-[1080px] relative overflow-hidden bg-ink" style={{ breakAfter: 'page', pageBreakAfter: 'always' }}>
+            <s.Component />
+          </div>
+        ))}
       </div>
 
       {/* Grid overlay */}

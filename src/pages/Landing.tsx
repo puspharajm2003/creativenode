@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthNavButton } from "@/components/AuthNavButton";
 import {
   ArrowDown, ArrowUpRight, Sparkles, Layers, Zap, Award,
   Instagram, Mail, Phone, MapPin,
@@ -146,7 +147,7 @@ const Landing = () => {
                 <Link to="/websites" className="px-5 py-3 hover:bg-gold/10 hover:text-gold transition tracking-[0.2em]">WEBSITES</Link>
               </div>
             </div>
-            <Link to="/login" className="px-3 py-1.5 border border-gold/40 hover:border-gold hover:text-gold rounded">ADMIN</Link>
+            <AuthNavButton className="px-3 py-1.5 border border-gold/40 hover:border-gold hover:text-gold rounded" />
           </div>
         </div>
       </nav>

@@ -13,11 +13,38 @@ export const Chatbot = () => {
     }
   ]);
   const [input, setInput] = useState("");
+  const [savedRecommendation, setSavedRecommendation] = useState<any>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-chat", handleOpen);
+    return () => window.removeEventListener("open-chat", handleOpen);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setIsOpen(true);
+      const d = e.detail;
+      setSavedRecommendation(d);
+      setMessages(prev => [
+        ...prev,
+        { role: "user", content: `Hi Nova! I'm ${d.name}. My business is ${d.businessType} and I need ${d.posterSize}.` },
+        { 
+          role: "assistant", 
+          content: `Thanks ${d.name}! Based on your needs, I've tailored a recommendation for you. Our team will also receive this directly.`,
+          card: { title: d.recommendedPlan, posters: d.postersCount, price: d.totalPrice, highlight: "Recommended for you" },
+          quickReplies: ["Connect on WhatsApp"]
+        }
+      ]);
+    };
+    window.addEventListener("nova-recommendation", handler);
+    return () => window.removeEventListener("nova-recommendation", handler);
+  }, []);
 
   const handleSend = (userMsgText: string) => {
     if (!userMsgText.trim()) return;
@@ -32,9 +59,20 @@ export const Chatbot = () => {
       let quickReplies: string[] = [];
       const lower = userMsgText.toLowerCase();
 
-      if (lower.includes("package") || lower.includes("price") || lower.includes("cost") || lower.includes("show me")) {
-        aiResponse = "We have three main tiers depending on the quality and volume you need. Which design quality are you looking for?";
-        quickReplies = ["Basic Design", "Standard Design", "Professional Design"];
+      if (lower.includes("package") || lower.includes("price") || lower.includes("cost") || lower.includes("show me") || lower.includes("plan") || lower.includes("quote")) {
+        if (savedRecommendation) {
+          aiResponse = "Based on the details you just submitted, here is the customized plan we recommend for you:";
+          card = { 
+            title: savedRecommendation.recommendedPlan, 
+            posters: savedRecommendation.postersCount, 
+            price: savedRecommendation.totalPrice, 
+            highlight: "Recommended for your business" 
+          };
+          quickReplies = ["Connect on WhatsApp"];
+        } else {
+          aiResponse = "We have three main tiers depending on the quality and volume you need. Which design quality are you looking for?";
+          quickReplies = ["Basic Design", "Standard Design", "Professional Design"];
+        }
       } else if (lower.includes("basic")) {
         aiResponse = "Our Basic Plan is great for simple, high-quality layouts.";
         card = { title: "Basic Package", posters: "5 Posters / Week", price: "₹1,999" };
@@ -47,7 +85,7 @@ export const Chatbot = () => {
         aiResponse = "Professional Design includes 3D elements, ultra HD, and full source files.";
         card = { title: "Pro Package", posters: "24 Posters / Month", price: "₹9,999", highlight: "Full Source Files" };
         quickReplies = ["Let's do Professional", "Actually, Standard is fine"];
-      } else if (lower.includes("start") || lower.includes("want") || lower.includes("yes") || lower.includes("hire") || lower.includes("fine")) {
+      } else if (lower.includes("start") || lower.includes("want") || lower.includes("yes") || lower.includes("hire") || lower.includes("fine") || lower.includes("connect")) {
         aiResponse = "Perfect! Let's get your project started. Reach out to our human team on WhatsApp to finalize the details.";
       } else {
         aiResponse = "Thanks for your message! To get accurate details, please message our team on WhatsApp.";
@@ -65,12 +103,12 @@ export const Chatbot = () => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-tr from-gold-deep to-gold-bright rounded-full shadow-[0_10px_40px_-10px_hsl(42_65%_50%)] flex items-center justify-center text-ink hover:scale-110 transition-transform ${isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}
+        className={`fixed bottom-24 right-6 md:bottom-6 md:right-6 z-[40] w-14 h-14 bg-gradient-to-tr from-gold-deep to-gold-bright rounded-full shadow-[0_10px_40px_-10px_hsl(42_65%_50%)] flex items-center justify-center text-ink hover:scale-110 transition-transform ${isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}
       >
         <MessageSquare className="w-6 h-6" />
       </button>
 
-      <div className={`fixed bottom-6 right-6 z-50 w-[350px] h-[550px] bg-ink/95 backdrop-blur-xl border border-gold/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right ${isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none"}`}>
+      <div className={`fixed bottom-24 right-6 md:bottom-6 md:right-6 z-[60] w-[calc(100vw-48px)] max-w-[350px] h-[550px] max-h-[calc(100vh-140px)] bg-ink/95 backdrop-blur-xl border border-gold/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right ${isOpen ? "scale-100 opacity-100" : "scale-0 opacity-0 pointer-events-none"}`}>
         {/* Header */}
         <div className="bg-gradient-to-r from-ink to-ink-soft border-b border-gold/20 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

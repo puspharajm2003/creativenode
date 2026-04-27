@@ -55,6 +55,47 @@ export type Database = {
           },
         ]
       }
+      client_websites: {
+        Row: {
+          approved: boolean
+          client_id: string
+          created_at: string
+          id: string
+          image_path: string
+          sort_order: number
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          image_path: string
+          sort_order?: number
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          image_path?: string
+          sort_order?: number
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_websites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           accent: string | null

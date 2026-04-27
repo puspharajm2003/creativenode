@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthNavButton } from "@/components/AuthNavButton";
 import { ArrowDown, ArrowUpRight, Download, Loader2, Instagram } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,7 +19,7 @@ interface Client {
 interface Poster { id: string; client_id: string; title: string | null; image_path: string; sort_order: number; }
 
 const PUBLIC_URL = (path: string) =>
-  supabase.storage.from("client-posters").getPublicUrl(path).data.publicUrl;
+  supabase.storage.from("client-websites").getPublicUrl(path).data.publicUrl;
 
 const Websites = () => {
   const root = useRef<HTMLDivElement>(null);
@@ -31,7 +32,7 @@ const Websites = () => {
     (async () => {
       const { data: c } = await supabase.from("clients").select("*").order("sort_order");
       const { data: p } = await supabase
-        .from("client_posters")
+        .from("client_websites")
         .select("*")
         .eq("approved", true)
         .order("sort_order");
@@ -296,7 +297,7 @@ const Websites = () => {
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               EXPORT GALLERY
             </button>
-            <Link to="/login" className="hover:text-gold transition">ADMIN</Link>
+            <AuthNavButton className="hover:text-gold transition" />
           </div>
         </div>
       </nav>
