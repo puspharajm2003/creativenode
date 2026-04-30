@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { SlideLayout } from "./SlideLayout";
 import { GoldCorner } from "./decor";
-import { ArrowRight, Loader2, CheckCircle2, Download, Pencil } from "lucide-react";
+import { ArrowRight, Loader2, CheckCircle2, Download, Pencil, FileText, X, Eye, AlertTriangle } from "lucide-react";
+import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-/* ── Plan options for editable confirm step ── */
+/* ── Plan catalog with validation constraints ── */
 const PLAN_OPTIONS = [
-  { plan: "Frame Poster", posters: "1 Poster", price: "₹149" },
-  { plan: "Basic Poster", posters: "5 Posters / Week", price: "₹1,999" },
-  { plan: "Standard Poster", posters: "24 Posters / Month", price: "₹9,999" },
+  { plan: "Frame Poster", posters: "1 Poster", price: "₹149", priceNum: 149 },
+  { plan: "Basic Poster", posters: "5 Posters / Week", price: "₹1,999", priceNum: 1999 },
+  { plan: "Standard Poster", posters: "24 Posters / Month", price: "₹9,999", priceNum: 9999 },
 ];
 
 export const Slide10Contact = () => {
@@ -25,37 +26,131 @@ export const Slide10Contact = () => {
   const [editPlan, setEditPlan] = useState("");
   const [editPosters, setEditPosters] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [validationWarning, setValidationWarning] = useState("");
+
+  /* PDF preview modal */
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
 
   const whatsappNumber = "916369278905";
 
   const recommend = (ps: string) => {
     const lower = ps.toLowerCase();
-    if (lower.includes("single") || lower.includes("1") || lower.includes("one")) {
-      return { plan: "Frame Poster", posters: "1 Poster", price: "₹149" };
-    } else if (lower.includes("week") || lower.includes("5") || lower.includes("few")) {
-      return { plan: "Basic Poster", posters: "5 Posters / Week", price: "₹1,999" };
-    }
-    return { plan: "Standard Poster", posters: "24 Posters / Month", price: "₹9,999" };
+    if (lower.includes("single") || lower.includes("1") || lower.includes("one")) return PLAN_OPTIONS[0];
+    if (lower.includes("week") || lower.includes("5") || lower.includes("few")) return PLAN_OPTIONS[1];
+    return PLAN_OPTIONS[2];
   };
+
+  const selectPlan = useCallback((opt: typeof PLAN_OPTIONS[0]) => {
+    setEditPlan(opt.plan);
+    setEditPosters(opt.posters);
+    setEditPrice(opt.price);
+    setValidationWarning("");
+  }, []);
+
+  /* ── Validate plan ── */
+  const validateSelection = useCallback(() => {
+    const lower = posterSize.toLowerCase();
+    const currentOpt = PLAN_OPTIONS.find(o => o.plan === editPlan);
+    if (!currentOpt) return;
+    if ((lower.includes("month") || lower.includes("24") || lower.includes("bulk")) && currentOpt.plan === "Frame Poster") {
+      setValidationWarning("Frame Poster is for single posters. Consider Basic or Standard for bulk needs.");
+    } else if ((lower.includes("single") || lower.includes("one")) && currentOpt.plan === "Standard Poster") {
+      setValidationWarning("Standard plan includes 24 posters/month. Frame Poster may be more cost-effective.");
+    } else {
+      setValidationWarning("");
+    }
+  }, [posterSize, editPlan]);
+
+  /* ── Receipt PDF ── */
+  const generateReceiptPDF = useCallback((data: { name: string; plan: string; posters: string; price: string; business: string }) => {
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const w = pdf.internal.pageSize.getWidth();
+    pdf.setFillColor(10, 10, 10);
+    pdf.rect(0, 0, w, 842, "F");
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(2);
+    pdf.line(40, 50, w - 40, 50);
+    pdf.setTextColor(212, 175, 55);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text("CREATIVENODE", 40, 40);
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text("CONFIRMATION RECEIPT", w - 40, 40, { align: "right" });
+    pdf.setFontSize(9);
+    pdf.text(new Date().toLocaleString(), w - 40, 70, { align: "right" });
+    let y = 100;
+    const label = (l: string, v: string) => {
+      pdf.setTextColor(150, 150, 150); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text(l.toUpperCase(), 40, y);
+      pdf.setTextColor(230, 220, 200); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text(v, 40, y + 16);
+      y += 40;
+    };
+    label("Name", data.name);
+    label("Business", data.business);
+    y += 10;
+    pdf.setDrawColor(212, 175, 55); pdf.setLineWidth(0.5); pdf.line(40, y, w - 40, y); y += 30;
+    pdf.setFillColor(20, 20, 20); pdf.setDrawColor(212, 175, 55); pdf.setLineWidth(1); pdf.rect(40, y, w - 80, 120, "FD");
+    pdf.setTextColor(212, 175, 55); pdf.setFontSize(10); pdf.text("SELECTED PLAN", 60, y + 25);
+    pdf.setTextColor(230, 220, 200); pdf.setFontSize(22); pdf.text(data.plan, 60, y + 55);
+    pdf.setTextColor(212, 175, 55); pdf.setFontSize(14); pdf.text(data.price, 60, y + 80);
+    pdf.setTextColor(150, 150, 150); pdf.setFontSize(10); pdf.text(data.posters, 60, y + 100);
+    y += 160;
+    pdf.setTextColor(100, 100, 100); pdf.setFontSize(9); pdf.setFont("helvetica", "normal");
+    pdf.text("This is a confirmation of your interest. Final pricing may vary.", 40, y);
+    pdf.text("Contact: +91 6369278905  |  hello@creativenode.in", 40, y + 16);
+    pdf.setDrawColor(212, 175, 55); pdf.setLineWidth(2); pdf.line(40, 810, w - 40, 810);
+    return pdf;
+  }, []);
+
+  /* ── Pitch deck preview ── */
+  const showPitchDeckPreview = useCallback(() => {
+    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pw = pdf.internal.pageSize.getWidth();
+    const ph = pdf.internal.pageSize.getHeight();
+    pdf.setFillColor(10, 10, 10); pdf.rect(0, 0, pw, ph, "F");
+    pdf.setTextColor(212, 175, 55); pdf.setFont("helvetica", "bold"); pdf.setFontSize(36);
+    pdf.text("CREATIVENODE", pw / 2, ph / 2 - 40, { align: "center" });
+    pdf.setFontSize(14); pdf.setTextColor(230, 220, 200);
+    pdf.text("Design Portfolio & Pricing Deck", pw / 2, ph / 2, { align: "center" });
+    pdf.setFontSize(10); pdf.setTextColor(150, 150, 150);
+    pdf.text("Preview — Full deck downloads via Print", pw / 2, ph / 2 + 30, { align: "center" });
+    // Pricing
+    pdf.addPage(); pdf.setFillColor(10, 10, 10); pdf.rect(0, 0, pw, ph, "F");
+    pdf.setTextColor(212, 175, 55); pdf.setFontSize(12); pdf.text("INVESTMENT", 40, 60);
+    pdf.setFontSize(28); pdf.text("Simple, transparent rates.", 40, 100);
+    for (const p of PLAN_OPTIONS) {
+      pdf.setTextColor(212, 175, 55); pdf.setFontSize(10); pdf.text(p.plan, 40, 150);
+      pdf.setTextColor(230, 220, 200); pdf.setFontSize(18); pdf.text(p.price + " — " + p.posters, 40, 170);
+    }
+    // Contact
+    pdf.addPage(); pdf.setFillColor(10, 10, 10); pdf.rect(0, 0, pw, ph, "F");
+    pdf.setTextColor(212, 175, 55); pdf.setFontSize(36);
+    pdf.text("Start Today.", pw / 2, ph / 2, { align: "center" });
+    pdf.setTextColor(200, 195, 180); pdf.setFontSize(14);
+    pdf.text("+91 6369278905  |  hello@creativenode.in", pw / 2, ph / 2 + 40, { align: "center" });
+
+    const blob = pdf.output("blob");
+    const url = URL.createObjectURL(blob);
+    setPreviewUrl(url);
+    setPreviewOpen(true);
+  }, []);
 
   /* Step 1 — validate, show confirm step */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const rec = recommend(posterSize);
-    setEditPlan(rec.plan);
-    setEditPosters(rec.posters);
-    setEditPrice(rec.price);
+    selectPlan(rec);
     setConfirming(true);
   };
 
-  /* Step 2 — save CRM + open WhatsApp */
+  /* Step 2 — save CRM + open WhatsApp + track */
   const handleConfirm = async () => {
+    validateSelection();
     setLoading(true);
 
-    /* Build the EXACT WhatsApp delivery text */
     const waPlain = `Hi Creativenode! I'm ${name} (${businessType}).\nPoster need: ${posterSize}\nSelected Plan: ${editPlan}\nPosters: ${editPosters}\nTotal: ${editPrice}`;
 
-    /* CRM record with full WhatsApp text for auditing */
     const crmMessage = [
       `Business Type: ${businessType}`,
       `Poster Size: ${posterSize}`,
@@ -66,6 +161,10 @@ export const Slide10Contact = () => {
       ``,
       `── WhatsApp Delivery Text ──`,
       waPlain,
+      ``,
+      `── WhatsApp Status ──`,
+      `Redirect initiated: ${new Date().toISOString()}`,
+      `Status: OPENED`,
     ].join("\n");
 
     const { error } = await supabase.from("contact_messages").insert([
@@ -87,12 +186,38 @@ export const Slide10Contact = () => {
     setConfirming(false);
   };
 
+  /* ── Preview Modal ── */
+  const PreviewModal = () => previewOpen ? (
+    <div className="fixed inset-0 z-[100] bg-ink/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="relative w-full max-w-5xl h-[85vh] bg-ink border border-gold/30 rounded-2xl overflow-hidden shadow-[0_30px_80px_-20px_rgba(212,175,55,0.15)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gold/15 bg-ink-soft/60">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gold" />
+            <span className="font-display text-sm tracking-widest text-gold">PITCH DECK PREVIEW</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href={previewUrl} download="creativenode-pitch-deck.pdf"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-display tracking-widest bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 rounded transition">
+              <Download className="w-3 h-3" /> DOWNLOAD
+            </a>
+            <button onClick={() => { setPreviewOpen(false); URL.revokeObjectURL(previewUrl); }}
+              className="p-1.5 rounded-full hover:bg-white/5 text-cream/50 hover:text-gold transition">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <iframe src={previewUrl} className="w-full h-[calc(100%-56px)]" title="Pitch Deck Preview" />
+      </div>
+    </div>
+  ) : null;
+
   return (
     <SlideLayout pageNumber={10} showFooter={false}>
       <GoldCorner position="tl" />
       <GoldCorner position="tr" />
       <GoldCorner position="bl" />
       <GoldCorner position="br" />
+      <PreviewModal />
 
       <div
         className="absolute inset-0 opacity-20 pointer-events-none"
@@ -114,12 +239,21 @@ export const Slide10Contact = () => {
             Fill in the quick details below. We'll add you to our CRM and open WhatsApp instantly.
           </p>
 
-          <button 
-            onClick={() => window.print()}
-            className="mb-12 px-8 py-3 bg-gold/10 border border-gold/40 text-gold hover:bg-gold hover:text-ink rounded shadow-[0_0_15px_hsl(var(--gold)/0.2)] hover:shadow-[0_0_25px_hsl(var(--gold)/0.4)] transition no-print font-display tracking-widest text-sm flex items-center gap-2"
-          >
-            DOWNLOAD LATEST PITCH DECK (PDF)
-          </button>
+          {/* Preview pitch deck button */}
+          <div className="flex gap-3 mb-12 no-print">
+            <button 
+              onClick={() => window.print()}
+              className="px-8 py-3 bg-gold/10 border border-gold/40 text-gold hover:bg-gold hover:text-ink rounded shadow-[0_0_15px_hsl(var(--gold)/0.2)] hover:shadow-[0_0_25px_hsl(var(--gold)/0.4)] transition font-display tracking-widest text-sm flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> DOWNLOAD PITCH DECK (PDF)
+            </button>
+            <button
+              onClick={showPitchDeckPreview}
+              className="px-6 py-3 border border-gold/30 text-cream/60 hover:text-gold hover:border-gold/50 rounded font-display tracking-widest text-sm flex items-center gap-2 transition"
+            >
+              <Eye className="w-4 h-4" /> PREVIEW
+            </button>
+          </div>
 
           {done ? (
              <div className="flex flex-col items-center p-12 bg-ink/60 border border-gold/30 rounded-2xl backdrop-blur-md w-full">
@@ -143,13 +277,26 @@ export const Slide10Contact = () => {
                  </div>
                )}
 
-               {/* Pitch deck PDF download link */}
-               <button
-                 onClick={() => window.print()}
-                 className="inline-flex items-center gap-2 mb-6 px-6 py-3 border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest text-sm transition"
-               >
-                 <Download className="w-4 h-4" /> DOWNLOAD PITCH DECK (PDF)
-               </button>
+               {/* Download receipt + preview deck */}
+               <div className="flex flex-wrap gap-3 mb-6 justify-center">
+                 <button
+                   onClick={() => {
+                     if (!lastSummary) return;
+                     const pdf = generateReceiptPDF({ name, plan: lastSummary.recommendedPlan, posters: lastSummary.postersCount, price: lastSummary.totalPrice, business: businessType });
+                     pdf.save(`creativenode-receipt-${Date.now()}.pdf`);
+                     toast.success("Receipt downloaded");
+                   }}
+                   className="inline-flex items-center gap-2 px-6 py-3 border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest text-sm transition"
+                 >
+                   <FileText className="w-4 h-4" /> DOWNLOAD RECEIPT
+                 </button>
+                 <button
+                   onClick={showPitchDeckPreview}
+                   className="inline-flex items-center gap-2 px-6 py-3 border border-gold/30 text-cream/60 hover:text-gold hover:border-gold/50 rounded font-display tracking-widest text-sm transition"
+                 >
+                   <Eye className="w-4 h-4" /> PREVIEW DECK
+                 </button>
+               </div>
 
                <p className="text-cream/50 text-sm">
                  If WhatsApp didn't open automatically, <a href={`https://wa.me/${whatsappNumber}`} target="_blank" className="text-gold underline">click here</a>.
@@ -183,14 +330,14 @@ export const Slide10Contact = () => {
               </div>
 
               {/* Editable plan */}
-              <div className="bg-ink border border-gold/20 rounded-xl p-6 mb-8 space-y-5">
+              <div className="bg-ink border border-gold/20 rounded-xl p-6 mb-4 space-y-5">
                 <h4 className="font-display text-gold text-sm tracking-widest uppercase">Selected Plan</h4>
                 <div className="flex gap-3 flex-wrap">
                   {PLAN_OPTIONS.map((opt) => (
                     <button
                       key={opt.plan}
                       type="button"
-                      onClick={() => { setEditPlan(opt.plan); setEditPosters(opt.posters); setEditPrice(opt.price); }}
+                      onClick={() => selectPlan(opt)}
                       className={`px-4 py-3 rounded-lg text-sm font-display tracking-wider border transition ${
                         editPlan === opt.plan
                           ? "border-gold bg-gold/15 text-gold shadow-[0_0_12px_hsl(var(--gold)/0.2)]"
@@ -207,9 +354,17 @@ export const Slide10Contact = () => {
                 </div>
               </div>
 
+              {/* Validation warning */}
+              {validationWarning && (
+                <div className="flex items-start gap-2 px-4 py-3 mb-4 rounded border border-amber-500/30 bg-amber-500/5 text-amber-400 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{validationWarning}</span>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <button
-                  onClick={() => setConfirming(false)}
+                  onClick={() => { setConfirming(false); setValidationWarning(""); }}
                   className="px-6 py-4 font-display tracking-widest text-sm text-cream/60 border border-gold/20 rounded-xl hover:text-cream hover:bg-white/5 transition"
                 >
                   BACK

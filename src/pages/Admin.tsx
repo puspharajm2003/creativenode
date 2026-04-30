@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   LogOut, Upload, Trash2, Loader2, Plus, ImagePlus, ExternalLink,
   Eye, EyeOff, GripVertical, MessageSquare, Receipt, LayoutGrid, Activity,
-  X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft
+  X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft, Phone, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Billing } from "@/components/admin/Billing";
@@ -450,7 +450,9 @@ const Admin = () => {
       ) : (
         <main className="p-8">
           <div className="mb-8">
-            <div className="text-xs font-display tracking-[0.4em] text-gold/70 mb-1">{messages.length} TOTAL · {unreadCount} UNREAD</div>
+            <div className="text-xs font-display tracking-[0.4em] text-gold/70 mb-1">
+              {messages.length} TOTAL · {unreadCount} UNREAD · {messages.filter(m => m.message.includes('── WhatsApp Status ──')).length} WA LEADS
+            </div>
             <h1 className="font-display text-5xl font-bold">Messages</h1>
             <p className="font-serif-elegant italic text-cream/60 text-lg mt-1">Contact form submissions from the landing page.</p>
           </div>
@@ -461,26 +463,68 @@ const Admin = () => {
             </div>
           ) : (
             <div className="space-y-3 max-w-4xl">
-              {messages.map((m) => (
-                <div key={m.id} className={`p-5 rounded border transition ${m.read ? "border-gold/15 bg-ink-soft/30" : "border-gold/40 bg-gold/5"}`}>
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <div>
-                      <div className="font-display font-semibold text-cream">{m.name}</div>
-                      <a href={`mailto:${m.email}`} className="text-xs text-gold hover:text-gold-bright">{m.email}</a>
+              {messages.map((m) => {
+                /* Parse WhatsApp tracking status from message body */
+                const isWaLead = m.message.includes('── WhatsApp Status ──');
+                const waStatusMatch = m.message.match(/Status: (\w+)/);
+                const waStatus = waStatusMatch ? waStatusMatch[1] : null;
+                const waTimeMatch = m.message.match(/Redirect initiated: (.+?)\n/);
+                const waTime = waTimeMatch ? waTimeMatch[1] : null;
+                /* Parse selected plan */
+                const planMatch = m.message.match(/Selected Plan: (.+?)\n/);
+                const planName = planMatch ? planMatch[1] : null;
+                const priceMatch = m.message.match(/Total Price: (.+?)\n/);
+                const totalPrice = priceMatch ? priceMatch[1] : null;
+
+                return (
+                  <div key={m.id} className={`p-5 rounded border transition ${m.read ? "border-gold/15 bg-ink-soft/30" : "border-gold/40 bg-gold/5"}`}>
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="font-display font-semibold text-cream">{m.name}</div>
+                          <a href={`mailto:${m.email}`} className="text-xs text-gold hover:text-gold-bright">{m.email}</a>
+                        </div>
+                        {/* WhatsApp status badge */}
+                        {isWaLead ? (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-[10px] font-display tracking-widest">
+                            <Phone className="w-3 h-3" />
+                            WA {waStatus ?? 'OPENED'}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-full border border-gold/20 bg-gold/5 text-gold/60 text-[10px] font-display tracking-widest">
+                            <MessageSquare className="w-3 h-3" />
+                            FORM
+                          </div>
+                        )}
+                        {/* Plan badge */}
+                        {planName && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-full border border-gold/20 bg-gold/5 text-gold text-[10px] font-display tracking-widest">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {planName} {totalPrice && `· ${totalPrice}`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <span className="text-xs text-cream/40 block">{new Date(m.created_at).toLocaleString()}</span>
+                          {isWaLead && waTime && (
+                            <span className="text-[10px] text-emerald-400/60 block">
+                              WA redirect: {new Date(waTime).toLocaleTimeString()}
+                            </span>
+                          )}
+                        </div>
+                        <button onClick={() => markRead(m)} className="text-xs text-cream/60 hover:text-gold px-2 py-1 border border-gold/20 rounded">
+                          {m.read ? "Mark unread" : "Mark read"}
+                        </button>
+                        <button onClick={() => deleteMessage(m)} className="w-8 h-8 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 flex items-center justify-center">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-cream/40">{new Date(m.created_at).toLocaleString()}</span>
-                      <button onClick={() => markRead(m)} className="text-xs text-cream/60 hover:text-gold px-2 py-1 border border-gold/20 rounded">
-                        {m.read ? "Mark unread" : "Mark read"}
-                      </button>
-                      <button onClick={() => deleteMessage(m)} className="w-8 h-8 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 flex items-center justify-center">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <p className="text-cream/80 whitespace-pre-wrap font-serif-elegant text-lg leading-relaxed">{m.message}</p>
                   </div>
-                  <p className="text-cream/80 whitespace-pre-wrap font-serif-elegant text-lg leading-relaxed">{m.message}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>
