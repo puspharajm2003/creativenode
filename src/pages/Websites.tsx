@@ -5,7 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthNavButton } from "@/components/AuthNavButton";
-import { ArrowDown, ArrowUpRight, Download, Loader2, Instagram } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Download, Loader2, Instagram, X, Globe, ExternalLink, Monitor } from "lucide-react";
 import { toast } from "sonner";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -16,7 +16,7 @@ interface Client {
   custom_link_url: string | null;
   custom_link_text: string | null;
 }
-interface Poster { id: string; client_id: string; title: string | null; image_path: string; sort_order: number; }
+interface Poster { id: string; client_id: string; title: string | null; image_path: string; sort_order: number; website_url?: string | null; }
 
 const PUBLIC_URL = (path: string) =>
   supabase.storage.from("client-websites").getPublicUrl(path).data.publicUrl;
@@ -27,6 +27,20 @@ const Websites = () => {
   const [posters, setPosters] = useState<Poster[]>([]);
   const [ready, setReady] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /* Apple-style popup */
+  const [popupItem, setPopupItem] = useState<Poster | null>(null);
+  const [popupAnimating, setPopupAnimating] = useState(false);
+  const [popupVisible, setPopupVisible] = useState(false);
+
+  const openPopup = (p: Poster) => {
+    setPopupItem(p);
+    setPopupVisible(true);
+    requestAnimationFrame(() => setPopupAnimating(true));
+  };
+  const closePopup = () => {
+    setPopupAnimating(false);
+    setTimeout(() => { setPopupVisible(false); setPopupItem(null); }, 500);
+  };
 
   useEffect(() => {
     (async () => {
@@ -446,6 +460,7 @@ const Websites = () => {
       {/* Per-client reels */}
       {clients.map((client, idx) => {
         const list = posters.filter((p) => p.client_id === client.id);
+        if (list.length === 0) return null;
         return (
           <section key={client.id} className="reel relative h-screen overflow-hidden" id={`reel-${client.slug}`}>
             <div className="absolute inset-0 bg-gradient-to-b from-ink via-ink-soft/40 to-ink" />
@@ -496,18 +511,46 @@ const Websites = () => {
                   </div>
                 ) : (
                   list.map((p, i) => (
-                    <div key={p.id} className="reel-card relative shrink-0 w-[600px] aspect-video rounded-2xl overflow-hidden group border border-gold/10 hover:border-gold/40 transition-colors duration-500 shadow-2xl hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.3)]">
-                      <img
-                        src={PUBLIC_URL(p.image_path)}
-                        alt={p.title ?? client.name}
-                        className="w-full h-full object-cover scale-110 group-hover:scale-105 transition-transform duration-1000 ease-out"
-                        loading="lazy"
-                      />
+                    <div key={p.id} onClick={() => openPopup(p)} className="reel-card relative shrink-0 w-[600px] aspect-video rounded-2xl overflow-hidden group border border-gold/10 hover:border-gold/40 transition-colors duration-500 shadow-2xl hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.3)] cursor-pointer">
+                      {p.website_url ? (
+                        <div className="w-full h-full relative overflow-hidden">
+                          <iframe
+                            src={p.website_url}
+                            className="w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"
+                            style={{ transform: 'scale(0.5)' }}
+                            title={p.title ?? client.name}
+                            loading="lazy"
+                            sandbox="allow-scripts allow-same-origin"
+                          />
+                        </div>
+                      ) : (
+                        <img
+                          src={PUBLIC_URL(p.image_path)}
+                          alt={p.title ?? client.name}
+                          className="w-full h-full object-cover scale-110 group-hover:scale-105 transition-transform duration-1000 ease-out"
+                          loading="lazy"
+                        />
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                      
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                        <div className="flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 text-white text-xs font-display tracking-widest">
+                          <Monitor className="w-3.5 h-3.5" /> OPEN PREVIEW
+                        </div>
+                      </div>
                       
                       <div className="absolute top-5 left-5 z-10 px-4 py-2 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
                         <span className="font-display tracking-[0.3em] text-gold text-[10px] font-bold">{String(i + 1).padStart(2, "0")} / {String(list.length).padStart(2, "0")}</span>
                       </div>
+                      
+                      {/* Website URL badge */}
+                      {p.website_url && (
+                        <div className="absolute top-5 right-5 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
+                          <Globe className="w-3 h-3 text-gold" />
+                          <span className="font-mono text-[10px] text-cream/60 max-w-[120px] truncate">{new URL(p.website_url).hostname}</span>
+                        </div>
+                      )}
                       
                       <div className="absolute bottom-0 left-0 right-0 z-10 p-8 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
                         <div className="flex items-center gap-3 text-xs font-display tracking-[0.4em] text-gold/90">
@@ -565,6 +608,68 @@ const Websites = () => {
       </section>
 
       </> /* end ready && clients.length > 0 */
+      )}
+
+      {/* ── Apple-style Website Popup ── */}
+      {popupVisible && popupItem && (
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${popupAnimating ? 'bg-black/80 backdrop-blur-2xl' : 'bg-black/0 backdrop-blur-none'}`} onClick={closePopup}>
+          <div
+            onClick={e => e.stopPropagation()}
+            className={`relative w-[95vw] max-w-7xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              popupAnimating
+                ? 'opacity-100 scale-100 translate-y-0'
+                : 'opacity-0 scale-[0.85] translate-y-8'
+            }`}
+          >
+            {/* macOS browser chrome */}
+            <div className="bg-[#1c1c1e] rounded-t-2xl border border-white/10 border-b-0">
+              <div className="flex items-center px-5 py-3.5 gap-3">
+                <div className="flex gap-2">
+                  <button onClick={closePopup} className="w-3.5 h-3.5 rounded-full bg-[#ff5f57] hover:brightness-110 transition group relative">
+                    <X className="w-2 h-2 text-[#4a0002] absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition" />
+                  </button>
+                  <div className="w-3.5 h-3.5 rounded-full bg-[#febc2e]" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-[#28c840]" />
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="bg-black/40 rounded-lg px-4 py-2 flex items-center gap-2 border border-white/5 max-w-2xl mx-auto">
+                    <Globe className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                    <span className="text-[13px] text-white/50 truncate font-mono">
+                      {popupItem.website_url || PUBLIC_URL(popupItem.image_path)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {popupItem.website_url && (
+                    <a href={popupItem.website_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                  <button onClick={closePopup} className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-b-2xl overflow-hidden border border-white/10 border-t-0 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]" style={{ height: '80vh' }}>
+              {popupItem.website_url ? (
+                <iframe src={popupItem.website_url} className="w-full h-full border-0" title={popupItem.title ?? 'Website Preview'} sandbox="allow-scripts allow-same-origin allow-popups allow-forms" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-ink">
+                  <img src={PUBLIC_URL(popupItem.image_path)} alt={popupItem.title ?? 'Website'} className="max-w-full max-h-full object-contain" />
+                </div>
+              )}
+            </div>
+            <div className={`mt-4 text-center transition-all duration-500 delay-200 ${
+              popupAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}>
+              <div className="font-display text-white text-lg tracking-widest">{popupItem.title ?? 'Untitled'}</div>
+              <div className="text-white/40 text-xs font-serif-elegant italic mt-1">
+                {clients.find(c => c.id === popupItem.client_id)?.name}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

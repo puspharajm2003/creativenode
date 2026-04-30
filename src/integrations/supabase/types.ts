@@ -65,6 +65,7 @@ export type Database = {
           sort_order: number
           title: string | null
           updated_at: string
+          website_url: string | null
         }
         Insert: {
           approved?: boolean
@@ -75,6 +76,7 @@ export type Database = {
           sort_order?: number
           title?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           approved?: boolean
@@ -85,6 +87,7 @@ export type Database = {
           sort_order?: number
           title?: string | null
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: [
           {

@@ -5,7 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   LogOut, Upload, Trash2, Loader2, Plus, ImagePlus, ExternalLink,
   Eye, EyeOff, GripVertical, MessageSquare, Receipt, LayoutGrid, Activity,
-  X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft, Phone, CheckCircle2
+  X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft, Phone, CheckCircle2,
+  Globe, Pencil, Monitor, Maximize2, Minimize2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Billing } from "@/components/admin/Billing";
@@ -34,6 +35,9 @@ interface Poster {
   id: string; client_id: string; title: string | null;
   image_path: string; sort_order: number; approved: boolean;
 }
+interface WebsiteEntry extends Poster {
+  website_url?: string | null;
+}
 interface ContactMessage {
   id: string; name: string; email: string; message: string;
   created_at: string; read: boolean;
@@ -49,7 +53,7 @@ const Admin = () => {
   const { user, signOut } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [posters, setPosters] = useState<Poster[]>([]);
-  const [websites, setWebsites] = useState<Poster[]>([]);
+  const [websites, setWebsites] = useState<WebsiteEntry[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [activeWebsiteClientId, setActiveWebsiteClientId] = useState<string>("");
@@ -60,12 +64,70 @@ const Admin = () => {
   const [clientToEdit, setClientToEdit] = useState<Client | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
   const websiteFileRef = useRef<HTMLInputElement>(null);
+  /* Apple-style website popup */
+  const [popupWebsite, setPopupWebsite] = useState<WebsiteEntry | null>(null);
+  const [popupAnimating, setPopupAnimating] = useState(false);
+  const [popupVisible, setPopupVisible] = useState(false);
+  /* Website URL input state */
+  const [websiteUrlInput, setWebsiteUrlInput] = useState("");
 
   const active = clients.find((c) => c.id === activeId);
   const activePosters = posters.filter((p) => p.client_id === activeId);
   const activeWebClient = clients.find((c) => c.id === activeWebsiteClientId);
   const activeWebsiteItems = websites.filter((w) => w.client_id === activeWebsiteClientId);
+
+  /* Apple-style popup open/close */
+  const openPopup = (w: WebsiteEntry) => {
+    setPopupWebsite(w);
+    setPopupVisible(true);
+    requestAnimationFrame(() => setPopupAnimating(true));
+  };
+  const closePopup = () => {
+    setPopupAnimating(false);
+    setTimeout(() => { setPopupVisible(false); setPopupWebsite(null); }, 500);
+  };
+
+  /* Save website URL */
+  const saveWebsiteUrl = async (w: WebsiteEntry, url: string) => {
+    const { error } = await supabase.from("client_websites").update({ website_url: url } as any).eq("id", w.id);
+    if (error) return toast.error(error.message);
+    toast.success("URL saved");
+    setWebsites(prev => prev.map(x => x.id === w.id ? { ...x, website_url: url } : x));
+  };
+
+  /* Edit website title */
+  const editWebsiteTitle = async (w: WebsiteEntry, title: string) => {
+    const { error } = await supabase.from("client_websites").update({ title }).eq("id", w.id);
+    if (error) return toast.error(error.message);
+    toast.success("Title updated");
+    setWebsites(prev => prev.map(x => x.id === w.id ? { ...x, title } : x));
+  };
   const unreadCount = messages.filter((m) => !m.read).length;
+
+  /* Toggle ALL website entries for a client between approved/hidden */
+  const toggleClientWebsiteVisibility = async (clientId: string) => {
+    const clientWebsites = websites.filter(w => w.client_id === clientId);
+    if (!clientWebsites.length) {
+      toast.error("No website entries to toggle");
+      return;
+    }
+    // If any are approved, hide all. If all hidden, show all.
+    const anyApproved = clientWebsites.some(w => w.approved);
+    const newStatus = !anyApproved;
+
+    const updates = clientWebsites.map(w =>
+      supabase.from("client_websites").update({ approved: newStatus }).eq("id", w.id)
+    );
+    const results = await Promise.all(updates);
+    if (results.some(r => r.error)) {
+      toast.error("Could not update visibility");
+      return;
+    }
+    setWebsites(prev => prev.map(w =>
+      w.client_id === clientId ? { ...w, approved: newStatus } : w
+    ));
+    toast.success(newStatus ? `${clients.find(c => c.id === clientId)?.name} is now visible` : `${clients.find(c => c.id === clientId)?.name} is now hidden`);
+  };
 
   const load = async () => {
     const [{ data: c }, { data: p }, { data: w }, { data: m }] = await Promise.all([
@@ -76,7 +138,7 @@ const Admin = () => {
     ]);
     setClients(c ?? []);
     setPosters((p ?? []) as Poster[]);
-    setWebsites((w ?? []) as Poster[]);
+    setWebsites((w ?? []) as WebsiteEntry[]);
     setMessages(m ?? []);
     if (!activeId && c && c.length) setActiveId(c[0].id);
     if (!activeWebsiteClientId && c && c.length) setActiveWebsiteClientId(c[0].id);
@@ -391,19 +453,55 @@ const Admin = () => {
           <aside className="w-72 border-r border-gold/15 bg-ink-soft/40 p-4 space-y-2 shrink-0">
             <div className="flex items-center justify-between mb-3">
               <span className="font-display tracking-[0.3em] text-gold/80 text-xs">CLIENTS</span>
-            </div>
-            {clients.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setActiveWebsiteClientId(c.id)}
-                className={`w-full text-left px-3 py-3 rounded border transition ${
-                  activeWebsiteClientId === c.id ? "border-gold bg-gold/10" : "border-gold/15 hover:border-gold/40"
-                }`}
-              >
-                <div className="font-display text-cream">{c.name}</div>
-                <div className="text-xs font-serif-elegant italic text-cream/50 truncate">{c.tagline}</div>
+              <button onClick={() => { setClientToEdit(undefined); setClientDialogOpen(true); }} className="w-7 h-7 rounded border border-gold/30 hover:border-gold hover:text-gold flex items-center justify-center text-cream/70">
+                <Plus className="w-3.5 h-3.5" />
               </button>
-            ))}
+            </div>
+            {clients.map((c) => {
+              const cWebsites = websites.filter(w => w.client_id === c.id);
+              const isHidden = cWebsites.length > 0 && cWebsites.every(w => !w.approved);
+              const hasEntries = cWebsites.length > 0;
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center gap-2 rounded border transition ${
+                    activeWebsiteClientId === c.id ? "border-gold bg-gold/10" : "border-gold/15 hover:border-gold/40"
+                  }`}
+                >
+                  <button
+                    onClick={() => setActiveWebsiteClientId(c.id)}
+                    className="flex-1 text-left px-3 py-3 min-w-0"
+                  >
+                    <div className={`font-display truncate ${isHidden ? 'text-cream/40 line-through' : 'text-cream'}`}>{c.name}</div>
+                    <div className="text-xs font-serif-elegant italic text-cream/50 truncate flex items-center gap-1">
+                      {c.tagline}
+                      {hasEntries && (
+                        <span className={`ml-auto shrink-0 text-[9px] font-display tracking-widest px-1.5 py-0.5 rounded-full border ${
+                          isHidden
+                            ? 'border-cream/20 text-cream/30 bg-cream/5'
+                            : 'border-emerald-500/30 text-emerald-400/70 bg-emerald-500/5'
+                        }`}>
+                          {isHidden ? 'HIDDEN' : `${cWebsites.filter(w => w.approved).length} LIVE`}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  {hasEntries && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleClientWebsiteVisibility(c.id); }}
+                      className={`shrink-0 w-8 h-8 mr-2 rounded-full border flex items-center justify-center transition ${
+                        isHidden
+                          ? 'border-cream/20 text-cream/30 hover:border-gold/40 hover:text-gold'
+                          : 'border-gold/30 text-gold hover:bg-gold/10'
+                      }`}
+                      title={isHidden ? 'Show on public page' : 'Hide from public page'}
+                    >
+                      {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </aside>
 
           <main className="flex-1 p-8">
@@ -414,10 +512,20 @@ const Admin = () => {
                     <div className="text-xs font-display tracking-[0.4em] text-gold/70 mb-1">
                       {activeWebsiteItems.length} SCREENSHOTS · {activeWebsiteItems.filter(w => w.approved).length} LIVE · {activeWebsiteItems.filter(w => !w.approved).length} PENDING
                     </div>
-                    <h1 className="font-display text-5xl font-bold">{activeWebClient.name}</h1>
+                    <div className="flex items-center gap-4">
+                      <h1 className="font-display text-5xl font-bold">{activeWebClient.name}</h1>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setClientToEdit(activeWebClient); setClientDialogOpen(true); }} className="px-3 py-1 text-xs border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest">
+                          EDIT
+                        </button>
+                        <button onClick={() => deleteClient(activeWebClient)} className="px-3 py-1 text-xs border border-destructive/40 text-destructive hover:bg-destructive/10 rounded font-display tracking-widest">
+                          DELETE
+                        </button>
+                      </div>
+                    </div>
                     <p className="font-serif-elegant italic text-cream/60 text-lg mt-1">{activeWebClient.tagline}</p>
                     <p className="text-xs text-cream/40 mt-3 font-serif-elegant italic">
-                      Drag screenshots to reorder · Click eye to approve / hide
+                      Drag screenshots to reorder · Click eye to approve / hide · Add URL for live preview
                     </p>
                   </div>
                   <label className="cursor-pointer flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display tracking-[0.2em] text-sm font-bold rounded hover:opacity-90 transition">
@@ -435,9 +543,9 @@ const Admin = () => {
                 ) : (
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEndWebsite}>
                     <SortableContext items={activeWebsiteItems.map((w) => w.id)} strategy={rectSortingStrategy}>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {activeWebsiteItems.map((w) => (
-                          <SortableWebsite key={w.id} poster={w} onDelete={deleteWebsite} onApprove={toggleApproveWebsite} />
+                          <SortableWebsiteCard key={w.id} entry={w} onDelete={deleteWebsite} onApprove={toggleApproveWebsite} onOpenPopup={openPopup} onSaveUrl={saveWebsiteUrl} onEditTitle={editWebsiteTitle} />
                         ))}
                       </div>
                     </SortableContext>
@@ -446,6 +554,79 @@ const Admin = () => {
               </>
             )}
           </main>
+
+          {/* ── Apple-style Website Popup ── */}
+          {popupVisible && popupWebsite && (
+            <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${popupAnimating ? 'bg-black/80 backdrop-blur-2xl' : 'bg-black/0 backdrop-blur-none'}`} onClick={closePopup}>
+              <div
+                onClick={e => e.stopPropagation()}
+                className={`relative w-[95vw] max-w-7xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  popupAnimating
+                    ? 'opacity-100 scale-100 translate-y-0'
+                    : 'opacity-0 scale-[0.85] translate-y-8'
+                }`}
+                style={{ perspective: '1200px' }}
+              >
+                {/* Browser chrome */}
+                <div className="bg-[#1c1c1e] rounded-t-2xl border border-white/10 border-b-0">
+                  <div className="flex items-center px-5 py-3.5 gap-3">
+                    {/* Traffic lights */}
+                    <div className="flex gap-2">
+                      <button onClick={closePopup} className="w-3.5 h-3.5 rounded-full bg-[#ff5f57] hover:brightness-110 transition group relative">
+                        <X className="w-2 h-2 text-[#4a0002] absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition" />
+                      </button>
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#febc2e]" />
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#28c840]" />
+                    </div>
+                    {/* URL bar */}
+                    <div className="flex-1 mx-4">
+                      <div className="bg-black/40 rounded-lg px-4 py-2 flex items-center gap-2 border border-white/5 max-w-2xl mx-auto">
+                        <Globe className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                        <span className="text-[13px] text-white/50 truncate font-mono">
+                          {popupWebsite.website_url || PUBLIC_URL_WEBSITES(popupWebsite.image_path)}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      {popupWebsite.website_url && (
+                        <a href={popupWebsite.website_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition" title="Open in new tab">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={closePopup} className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* Content area */}
+                <div className="bg-white rounded-b-2xl overflow-hidden border border-white/10 border-t-0 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]" style={{ height: '80vh' }}>
+                  {popupWebsite.website_url ? (
+                    <iframe
+                      src={popupWebsite.website_url}
+                      className="w-full h-full border-0"
+                      title={popupWebsite.title ?? 'Website Preview'}
+                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-ink">
+                      <img src={PUBLIC_URL_WEBSITES(popupWebsite.image_path)} alt={popupWebsite.title ?? 'Website'} className="max-w-full max-h-full object-contain" />
+                    </div>
+                  )}
+                </div>
+                {/* Bottom info bar */}
+                <div className={`mt-4 text-center transition-all duration-500 delay-200 ${
+                  popupAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}>
+                  <div className="font-display text-white text-lg tracking-widest">{popupWebsite.title ?? 'Untitled'}</div>
+                  <div className="text-white/40 text-xs font-serif-elegant italic mt-1">
+                    {clients.find(c => c.id === popupWebsite.client_id)?.name}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <main className="p-8">
@@ -595,54 +776,140 @@ const SortablePoster = ({
   );
 };
 
-const SortableWebsite = ({
-  poster, onDelete, onApprove,
-}: { poster: Poster; onDelete: (p: Poster) => void; onApprove: (p: Poster) => void }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: poster.id });
+const SortableWebsiteCard = ({
+  entry, onDelete, onApprove, onOpenPopup, onSaveUrl, onEditTitle,
+}: {
+  entry: WebsiteEntry;
+  onDelete: (p: Poster) => void;
+  onApprove: (p: Poster) => void;
+  onOpenPopup: (w: WebsiteEntry) => void;
+  onSaveUrl: (w: WebsiteEntry, url: string) => void;
+  onEditTitle: (w: WebsiteEntry, title: string) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entry.id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-  return (
-    <div ref={setNodeRef} style={style} className="group relative poster-card aspect-video">
-      <img src={PUBLIC_URL_WEBSITES(poster.image_path)} alt={poster.title ?? "Website"} className="w-full h-full object-cover rounded-lg" loading="lazy" />
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlDraft, setUrlDraft] = useState(entry.website_url ?? "");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(entry.title ?? "");
 
-      {/* Status badge */}
-      <div className="absolute top-3 left-3 z-10">
-        <span className={`px-2 py-1 text-[10px] font-display tracking-widest rounded backdrop-blur-sm border ${
-          poster.approved
-            ? "bg-gold/20 border-gold/50 text-gold"
-            : "bg-ink/70 border-cream/30 text-cream/70"
-        }`}>
-          {poster.approved ? "LIVE" : "PENDING"}
-        </span>
+  return (
+    <div ref={setNodeRef} style={style} className="group relative rounded-xl border border-gold/15 bg-ink-soft/40 overflow-hidden hover:border-gold/40 transition-colors">
+      {/* Screenshot / iframe preview */}
+      <div className="relative aspect-video cursor-pointer" onClick={() => onOpenPopup(entry)}>
+        {entry.website_url ? (
+          <div className="w-full h-full relative overflow-hidden">
+            <iframe
+              src={entry.website_url}
+              className="w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"
+              style={{ transform: 'scale(0.5)' }}
+              title={entry.title ?? 'Preview'}
+              loading="lazy"
+              sandbox="allow-scripts allow-same-origin"
+            />
+            <div className="absolute inset-0 bg-transparent hover:bg-ink/10 transition" />
+          </div>
+        ) : (
+          <img src={PUBLIC_URL_WEBSITES(entry.image_path)} alt={entry.title ?? "Website"} className="w-full h-full object-cover" loading="lazy" />
+        )}
+        {/* Overlay on hover */}
+        <div className="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-white text-xs font-display tracking-widest">
+            <Monitor className="w-3.5 h-3.5" /> OPEN PREVIEW
+          </div>
+        </div>
+        {/* Status badge */}
+        <div className="absolute top-3 left-3 z-10">
+          <span className={`px-2 py-1 text-[10px] font-display tracking-widest rounded backdrop-blur-sm border ${
+            entry.approved ? "bg-gold/20 border-gold/50 text-gold" : "bg-ink/70 border-cream/30 text-cream/70"
+          }`}>
+            {entry.approved ? "LIVE" : "PENDING"}
+          </span>
+        </div>
+        {/* Drag handle */}
+        <button
+          {...attributes} {...listeners}
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-ink/80 border border-gold/40 text-gold opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-grab active:cursor-grabbing"
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
       </div>
 
-      {/* Drag handle */}
-      <button
-        {...attributes} {...listeners}
-        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-ink/80 border border-gold/40 text-gold opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-grab active:cursor-grabbing"
-        title="Drag to reorder"
-      >
-        <GripVertical className="w-3.5 h-3.5" />
-      </button>
+      {/* Info section */}
+      <div className="p-4 space-y-3">
+        {/* Editable title */}
+        <div className="flex items-center gap-2">
+          {editingTitle ? (
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={e => setTitleDraft(e.target.value)}
+              onBlur={() => { onEditTitle(entry, titleDraft); setEditingTitle(false); }}
+              onKeyDown={e => { if (e.key === 'Enter') { onEditTitle(entry, titleDraft); setEditingTitle(false); } }}
+              className="flex-1 bg-black/20 border border-gold/20 rounded px-2 py-1 text-sm text-cream outline-none focus:border-gold/50"
+            />
+          ) : (
+            <span className="flex-1 font-display text-cream text-sm truncate">{entry.title || 'Untitled'}</span>
+          )}
+          <button onClick={() => { setTitleDraft(entry.title ?? ""); setEditingTitle(!editingTitle); }} className="p-1 text-cream/40 hover:text-gold transition">
+            <Pencil className="w-3 h-3" />
+          </button>
+        </div>
 
-      <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between z-10 gap-2">
-        <span className="font-serif-elegant italic text-cream text-sm truncate flex-1">{poster.title}</span>
-        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+        {/* URL input */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-1.5 bg-black/20 border border-gold/10 rounded-lg px-3 py-2 focus-within:border-gold/40 transition">
+            <Globe className="w-3 h-3 text-gold/40 shrink-0" />
+            {editingUrl ? (
+              <input
+                autoFocus
+                value={urlDraft}
+                onChange={e => setUrlDraft(e.target.value)}
+                onBlur={() => { onSaveUrl(entry, urlDraft); setEditingUrl(false); }}
+                onKeyDown={e => { if (e.key === 'Enter') { onSaveUrl(entry, urlDraft); setEditingUrl(false); } }}
+                placeholder="https://example.com"
+                className="flex-1 bg-transparent text-xs text-cream/70 outline-none placeholder:text-cream/20 font-mono"
+              />
+            ) : (
+              <span
+                onClick={() => { setUrlDraft(entry.website_url ?? ""); setEditingUrl(true); }}
+                className="flex-1 text-xs text-cream/50 truncate cursor-text font-mono"
+              >
+                {entry.website_url || 'Click to add URL...'}
+              </span>
+            )}
+          </div>
+          {entry.website_url && (
+            <a href={entry.website_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-cream/40 hover:text-gold transition" title="Open in browser">
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+
+        {/* Actions row */}
+        <div className="flex items-center justify-between pt-1 border-t border-gold/10">
           <button
-            onClick={() => onApprove(poster)}
-            className={`w-8 h-8 rounded-full bg-ink/80 border flex items-center justify-center ${
-              poster.approved ? "border-gold/50 text-gold" : "border-cream/30 text-cream/70 hover:border-gold hover:text-gold"
+            onClick={() => onApprove(entry)}
+            className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-display tracking-widest rounded transition ${
+              entry.approved ? "text-gold hover:text-cream" : "text-cream/50 hover:text-gold"
             }`}
-            title={poster.approved ? "Hide from showcase" : "Approve for showcase"}
           >
-            {poster.approved ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            {entry.approved ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            {entry.approved ? 'VISIBLE' : 'HIDDEN'}
           </button>
-          <button onClick={() => onDelete(poster)} className="w-8 h-8 rounded-full bg-ink/80 border border-destructive/40 text-destructive flex items-center justify-center">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex gap-1">
+            <button onClick={() => onOpenPopup(entry)} className="p-1.5 text-cream/40 hover:text-gold transition" title="Preview">
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => onDelete(entry)} className="p-1.5 text-cream/40 hover:text-destructive transition" title="Delete">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
