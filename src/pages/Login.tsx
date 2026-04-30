@@ -5,15 +5,15 @@ import { Lock, Mail, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const Login = () => {
-  const { signIn, user, isAdmin, loading } = useAuth();
+  const { signIn, user, isSuperAdmin, loading } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && isAdmin) nav("/admin", { replace: true });
-  }, [user, isAdmin, loading, nav]);
+    if (!loading && user && isSuperAdmin) nav("/admin", { replace: true });
+  }, [user, isSuperAdmin, loading, nav]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

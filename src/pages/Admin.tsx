@@ -42,32 +42,44 @@ interface ContactMessage {
 const PUBLIC_URL = (path: string) =>
   supabase.storage.from("client-posters").getPublicUrl(path).data.publicUrl;
 
+const PUBLIC_URL_WEBSITES = (path: string) =>
+  supabase.storage.from("client-websites").getPublicUrl(path).data.publicUrl;
+
 const Admin = () => {
   const { user, signOut } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [posters, setPosters] = useState<Poster[]>([]);
+  const [websites, setWebsites] = useState<Poster[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [activeWebsiteClientId, setActiveWebsiteClientId] = useState<string>("");
   const [tab, setTab] = useState<"analytics" | "clients" | "websites" | "messages" | "billing">("analytics");
   const [uploading, setUploading] = useState(false);
+  const [uploadingWebsite, setUploadingWebsite] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
+  const websiteFileRef = useRef<HTMLInputElement>(null);
 
   const active = clients.find((c) => c.id === activeId);
   const activePosters = posters.filter((p) => p.client_id === activeId);
+  const activeWebClient = clients.find((c) => c.id === activeWebsiteClientId);
+  const activeWebsiteItems = websites.filter((w) => w.client_id === activeWebsiteClientId);
   const unreadCount = messages.filter((m) => !m.read).length;
 
   const load = async () => {
-    const [{ data: c }, { data: p }, { data: m }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: w }, { data: m }] = await Promise.all([
       supabase.from("clients").select("*").order("sort_order"),
       supabase.from("client_posters").select("*").order("sort_order"),
+      supabase.from("client_websites").select("*").order("sort_order"),
       supabase.from("contact_messages").select("*").order("created_at", { ascending: false }),
     ]);
     setClients(c ?? []);
     setPosters((p ?? []) as Poster[]);
+    setWebsites((w ?? []) as Poster[]);
     setMessages(m ?? []);
     if (!activeId && c && c.length) setActiveId(c[0].id);
+    if (!activeWebsiteClientId && c && c.length) setActiveWebsiteClientId(c[0].id);
   };
   useEffect(() => { load(); }, []);
 
@@ -176,6 +188,71 @@ const Admin = () => {
     // persist
     const updates = reordered.map((p, i) =>
       supabase.from("client_posters").update({ sort_order: i + 1 }).eq("id", p.id)
+    );
+    const results = await Promise.all(updates);
+    if (results.some((r) => r.error)) toast.error("Could not save order");
+  };
+
+  /* ── Website management ── */
+  const onUploadWebsite = async (files: FileList | null) => {
+    if (!files || !activeWebClient) return;
+    setUploadingWebsite(true);
+    try {
+      for (const file of Array.from(files)) {
+        const ext = file.name.split(".").pop() || "png";
+        const path = `${activeWebClient.slug}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("client-websites").upload(path, file, {
+          cacheControl: "3600", upsert: false,
+        });
+        if (upErr) throw upErr;
+        const max = activeWebsiteItems.reduce((m, w) => Math.max(m, w.sort_order), 0);
+        const { error: insErr } = await supabase.from("client_websites").insert({
+          client_id: activeWebClient.id, image_path: path,
+          title: file.name.replace(/\.[^.]+$/, ""), sort_order: max + 1,
+        });
+        if (insErr) throw insErr;
+      }
+      toast.success("Website screenshot uploaded — awaiting approval");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message ?? "Upload failed");
+    } finally {
+      setUploadingWebsite(false);
+      if (websiteFileRef.current) websiteFileRef.current.value = "";
+    }
+  };
+
+  const deleteWebsite = async (w: Poster) => {
+    if (!confirm("Delete this website screenshot?")) return;
+    await supabase.storage.from("client-websites").remove([w.image_path]);
+    await supabase.from("client_websites").delete().eq("id", w.id);
+    toast.success("Deleted");
+    load();
+  };
+
+  const toggleApproveWebsite = async (w: Poster) => {
+    const { error } = await supabase
+      .from("client_websites")
+      .update({ approved: !w.approved })
+      .eq("id", w.id);
+    if (error) return toast.error(error.message);
+    toast.success(w.approved ? "Hidden from showcase" : "Approved & live");
+    setWebsites((prev) => prev.map((x) => x.id === w.id ? { ...x, approved: !w.approved } : x));
+  };
+
+  const onDragEndWebsite = async (e: DragEndEvent) => {
+    const { active: a, over } = e;
+    if (!over || a.id === over.id) return;
+    const ids = activeWebsiteItems.map((w) => w.id);
+    const oldIdx = ids.indexOf(a.id as string);
+    const newIdx = ids.indexOf(over.id as string);
+    const reordered = arrayMove(activeWebsiteItems, oldIdx, newIdx);
+    const reorderedById = new Map(reordered.map((w, i) => [w.id, i + 1]));
+    setWebsites((prev) =>
+      prev.map((w) => reorderedById.has(w.id) ? { ...w, sort_order: reorderedById.get(w.id)! } : w)
+    );
+    const updates = reordered.map((w, i) =>
+      supabase.from("client_websites").update({ sort_order: i + 1 }).eq("id", w.id)
     );
     const results = await Promise.all(updates);
     if (results.some((r) => r.error)) toast.error("Could not save order");
@@ -310,25 +387,66 @@ const Admin = () => {
           </main>
         </div>
       ) : tab === "websites" ? (
-        <main className="p-8">
-          <div className="mb-8">
-            <h1 className="font-display text-5xl font-bold">Websites</h1>
-            <p className="font-serif-elegant italic text-cream/60 text-lg mt-1">Manage your website portfolio here.</p>
-          </div>
-          <div className="border border-dashed border-gold/30 rounded-lg p-20 text-center max-w-4xl">
-            <LayoutGrid className="w-10 h-10 text-gold/50 mx-auto mb-4" />
-            <p className="font-serif-elegant italic text-cream/60 text-lg mb-4">Website Portfolio Database Update Required</p>
-            <p className="text-cream/50 text-sm max-w-lg mx-auto leading-relaxed">
-              To independently manage your website portfolio, a new <code className="text-gold bg-gold/10 px-1 rounded">client_websites</code> table needs to be created in your Supabase dashboard (mirroring the structure of <code className="text-gold bg-gold/10 px-1 rounded">client_posters</code>).
-            </p>
-            <p className="text-cream/50 text-sm max-w-lg mx-auto leading-relaxed mt-4">
-              Currently, the <Link to="/websites" className="text-gold hover:text-gold-bright transition underline">Websites</Link> gallery will pull from your existing posters until the new database table is connected.
-            </p>
-            <button className="mt-8 px-6 py-3 border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest text-xs transition">
-              I HAVE CREATED THE TABLE
-            </button>
-          </div>
-        </main>
+        <div className="flex min-h-[calc(100vh-7rem)]">
+          <aside className="w-72 border-r border-gold/15 bg-ink-soft/40 p-4 space-y-2 shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-display tracking-[0.3em] text-gold/80 text-xs">CLIENTS</span>
+            </div>
+            {clients.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveWebsiteClientId(c.id)}
+                className={`w-full text-left px-3 py-3 rounded border transition ${
+                  activeWebsiteClientId === c.id ? "border-gold bg-gold/10" : "border-gold/15 hover:border-gold/40"
+                }`}
+              >
+                <div className="font-display text-cream">{c.name}</div>
+                <div className="text-xs font-serif-elegant italic text-cream/50 truncate">{c.tagline}</div>
+              </button>
+            ))}
+          </aside>
+
+          <main className="flex-1 p-8">
+            {activeWebClient && (
+              <>
+                <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+                  <div>
+                    <div className="text-xs font-display tracking-[0.4em] text-gold/70 mb-1">
+                      {activeWebsiteItems.length} SCREENSHOTS · {activeWebsiteItems.filter(w => w.approved).length} LIVE · {activeWebsiteItems.filter(w => !w.approved).length} PENDING
+                    </div>
+                    <h1 className="font-display text-5xl font-bold">{activeWebClient.name}</h1>
+                    <p className="font-serif-elegant italic text-cream/60 text-lg mt-1">{activeWebClient.tagline}</p>
+                    <p className="text-xs text-cream/40 mt-3 font-serif-elegant italic">
+                      Drag screenshots to reorder · Click eye to approve / hide
+                    </p>
+                  </div>
+                  <label className="cursor-pointer flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display tracking-[0.2em] text-sm font-bold rounded hover:opacity-90 transition">
+                    {uploadingWebsite ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    UPLOAD SCREENSHOT
+                    <input ref={websiteFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUploadWebsite(e.target.files)} />
+                  </label>
+                </div>
+
+                {activeWebsiteItems.length === 0 ? (
+                  <div className="border border-dashed border-gold/30 rounded-lg p-20 text-center">
+                    <ImagePlus className="w-10 h-10 text-gold/50 mx-auto mb-4" />
+                    <p className="font-serif-elegant italic text-cream/60">No website screenshots yet — upload the first one above.</p>
+                  </div>
+                ) : (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEndWebsite}>
+                    <SortableContext items={activeWebsiteItems.map((w) => w.id)} strategy={rectSortingStrategy}>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                        {activeWebsiteItems.map((w) => (
+                          <SortableWebsite key={w.id} poster={w} onDelete={deleteWebsite} onApprove={toggleApproveWebsite} />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </>
+            )}
+          </main>
+        </div>
       ) : (
         <main className="p-8">
           <div className="mb-8">
@@ -391,6 +509,60 @@ const SortablePoster = ({
   return (
     <div ref={setNodeRef} style={style} className="group relative poster-card aspect-[3/4]">
       <img src={PUBLIC_URL(poster.image_path)} alt={poster.title ?? "Poster"} className="w-full h-full object-cover" loading="lazy" />
+
+      {/* Status badge */}
+      <div className="absolute top-3 left-3 z-10">
+        <span className={`px-2 py-1 text-[10px] font-display tracking-widest rounded backdrop-blur-sm border ${
+          poster.approved
+            ? "bg-gold/20 border-gold/50 text-gold"
+            : "bg-ink/70 border-cream/30 text-cream/70"
+        }`}>
+          {poster.approved ? "LIVE" : "PENDING"}
+        </span>
+      </div>
+
+      {/* Drag handle */}
+      <button
+        {...attributes} {...listeners}
+        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-ink/80 border border-gold/40 text-gold opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-grab active:cursor-grabbing"
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+
+      <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between z-10 gap-2">
+        <span className="font-serif-elegant italic text-cream text-sm truncate flex-1">{poster.title}</span>
+        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+          <button
+            onClick={() => onApprove(poster)}
+            className={`w-8 h-8 rounded-full bg-ink/80 border flex items-center justify-center ${
+              poster.approved ? "border-gold/50 text-gold" : "border-cream/30 text-cream/70 hover:border-gold hover:text-gold"
+            }`}
+            title={poster.approved ? "Hide from showcase" : "Approve for showcase"}
+          >
+            {poster.approved ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
+          <button onClick={() => onDelete(poster)} className="w-8 h-8 rounded-full bg-ink/80 border border-destructive/40 text-destructive flex items-center justify-center">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SortableWebsite = ({
+  poster, onDelete, onApprove,
+}: { poster: Poster; onDelete: (p: Poster) => void; onApprove: (p: Poster) => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: poster.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="group relative poster-card aspect-video">
+      <img src={PUBLIC_URL_WEBSITES(poster.image_path)} alt={poster.title ?? "Website"} className="w-full h-full object-cover rounded-lg" loading="lazy" />
 
       {/* Status badge */}
       <div className="absolute top-3 left-3 z-10">

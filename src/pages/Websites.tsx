@@ -269,8 +269,18 @@ const Websites = () => {
     return () => ctx.revert();
   }, [ready]);
 
+  /* ── Skeleton shimmer keyframes (inline style) ── */
+  const shimmerStyle = {
+    background: 'linear-gradient(90deg, transparent 0%, hsl(42 65% 50% / 0.06) 50%, transparent 100%)',
+    backgroundSize: '200% 100%',
+    animation: 'skeleton-shimmer 1.8s ease-in-out infinite',
+  } as React.CSSProperties;
+
   return (
     <div ref={root} className="bg-ink text-cream no-scrollbar overflow-x-hidden">
+      {/* Skeleton shimmer keyframe */}
+      <style>{`@keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+
       {/* Top nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-ink/40 border-b border-gold/10">
         <div className="flex items-center justify-between px-8 py-5 max-w-[1800px] mx-auto">
@@ -301,6 +311,81 @@ const Websites = () => {
           </div>
         </div>
       </nav>
+
+      {/* ── Loading skeletons ── */}
+      {!ready && (
+        <>
+          {/* Skeleton hero */}
+          <section className="relative h-screen flex items-center justify-center">
+            <div className="relative z-10 text-center px-6 max-w-5xl w-full space-y-8">
+              <div className="mx-auto w-64 h-4 rounded-full bg-gold/10" style={shimmerStyle} />
+              <div className="mx-auto w-[80%] h-24 rounded-xl bg-cream/5" style={shimmerStyle} />
+              <div className="mx-auto w-[60%] h-6 rounded-full bg-cream/5" style={shimmerStyle} />
+              <div className="flex justify-center gap-12 mt-12">
+                {[1,2,3].map(i => (
+                  <div key={i} className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-8 rounded bg-gold/10" style={shimmerStyle} />
+                    <div className="w-16 h-3 rounded-full bg-cream/5" style={shimmerStyle} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Skeleton marquee */}
+          <section className="py-16 border-y border-gold/10">
+            <div className="flex gap-16 px-8">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="shrink-0 w-48 h-16 rounded-lg bg-cream/5" style={shimmerStyle} />
+              ))}
+            </div>
+          </section>
+
+          {/* Skeleton reels */}
+          {[1,2,3].map(i => (
+            <section key={i} className="relative h-screen flex items-center px-24">
+              <div className="shrink-0 w-[400px] space-y-4 pr-12">
+                <div className="w-24 h-3 rounded-full bg-gold/10" style={shimmerStyle} />
+                <div className="w-48 h-12 rounded-lg bg-cream/5" style={shimmerStyle} />
+                <div className="w-36 h-4 rounded-full bg-cream/5" style={shimmerStyle} />
+                <div className="w-32 h-px bg-gold/10" />
+              </div>
+              <div className="flex gap-8 pl-12">
+                {[1,2,3].map(j => (
+                  <div key={j} className="shrink-0 w-[600px] aspect-video rounded-2xl border border-gold/10 bg-ink-soft/40" style={shimmerStyle} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </>
+      )}
+
+      {/* ── Empty state when loaded but no data ── */}
+      {ready && clients.length === 0 && (
+        <section className="min-h-screen flex items-center justify-center px-8 pt-24">
+          <div className="text-center max-w-lg space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-full border-2 border-gold/30 flex items-center justify-center bg-gold/5">
+              <ArrowUpRight className="w-9 h-9 text-gold/60" />
+            </div>
+            <h2 className="font-display text-4xl font-bold text-cream">No Websites Yet</h2>
+            <p className="font-serif-elegant italic text-cream/60 text-lg leading-relaxed">
+              Website projects will appear here once they've been uploaded and approved through the CRM panel.
+            </p>
+            <div className="flex gap-4 justify-center pt-2">
+              <Link to="/clients" className="px-6 py-3 border border-gold/40 text-cream hover:text-gold hover:border-gold font-display tracking-widest text-xs rounded transition">
+                VIEW POSTERS
+              </Link>
+              <a href="https://wa.me/916369278905" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display tracking-widest text-xs font-bold rounded hover:opacity-90 transition">
+                START A PROJECT
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Main content (only when ready with data) ── */}
+      {ready && clients.length > 0 && (
+      <>
 
       {/* HERO — pinned with parallax */}
       <section className="hero relative h-screen overflow-hidden flex items-center justify-center">
@@ -478,6 +563,9 @@ const Websites = () => {
           © CREATIVENODE · @creativenode.in · +91 6369278905
         </div>
       </section>
+
+      </> /* end ready && clients.length > 0 */
+      )}
     </div>
   );
 };
