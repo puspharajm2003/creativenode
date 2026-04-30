@@ -23,14 +23,18 @@ export const AnalyticsTracker = () => {
       }
 
       try {
-        await supabase.from("page_views").insert({
+        const { error } = await supabase.from("page_views").insert({
           path: location.pathname,
           session_id: getSessionId(),
           user_agent: navigator.userAgent,
           referrer: document.referrer || "direct"
         });
-      } catch (err) {
-        console.error("Failed to track pageview", err);
+        // Silently ignore if table doesn't exist (404) or RLS blocks
+        if (error && error.code !== "42P01" && !error.message?.includes("404")) {
+          // Only log unexpected errors
+        }
+      } catch {
+        // Silently fail — analytics should never break the app
       }
     };
 
