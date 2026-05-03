@@ -1,11 +1,94 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, Crown, Zap, Sparkles } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Crown, Zap, Sparkles, X, ShieldCheck } from "lucide-react";
 import { AuthNavButton } from "@/components/AuthNavButton";
+import { toast } from "sonner";
 
 const Plan = () => {
   const [pricingTab, setPricingTab] = useState<'posters' | 'websites'>('posters');
   const [posterFreq, setPosterFreq] = useState<'single' | 'weekly' | 'monthly'>('single');
+
+  // Payment Panel State
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<{name: string, priceText: string, numericPrice: number} | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [discountPercent, setDiscountPercent] = useState(0);
+
+  const handleCheckout = (planName: string, priceText: string) => {
+    // Extract numeric price (e.g. "₹1,999" -> 1999)
+    const numericPrice = parseInt(priceText.replace(/[^0-9]/g, ''), 10);
+    if (!numericPrice) {
+      // If it's a completely custom/unpriced plan
+      window.dispatchEvent(new CustomEvent('open-chat'));
+      return;
+    }
+    setSelectedPlan({ name: planName, priceText, numericPrice });
+    setPromoCode("");
+    setDiscountPercent(0);
+    setPaymentModalOpen(true);
+  };
+
+  const handleApplyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (code === "CREATIVE10") {
+      setDiscountPercent(10);
+      toast.success("Promo code applied! 10% OFF.");
+    } else if (code === "LUXURY20") {
+      setDiscountPercent(20);
+      toast.success("Promo code applied! 20% OFF.");
+    } else {
+      setDiscountPercent(0);
+      toast.error("Invalid Promo Code");
+    }
+  };
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPlan) return;
+    const isLoaded = await loadRazorpayScript();
+    if (!isLoaded) {
+      toast.error("Failed to load payment gateway. Please try again.");
+      return;
+    }
+
+    const finalPrice = Math.round(selectedPlan.numericPrice * (1 - discountPercent / 100));
+
+    const options = {
+      key: "rzp_live_SkvWhIjdLWKBkI", // Razorpay Live API Key
+      amount: finalPrice * 100, // Amount in paise
+      currency: "INR",
+      name: "CreativeNode",
+      description: `Purchase: ${selectedPlan.name}`,
+      image: "/favicon.jpg",
+      handler: function (response: any) {
+        toast.success(`Payment Successful! Transaction ID: ${response.razorpay_payment_id}`);
+        setPaymentModalOpen(false);
+        // Dispatch event for chat or success route if needed
+      },
+      theme: {
+        color: "#D4AF37" // Luxury Gold theme
+      }
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.on('payment.failed', function (response: any){
+        toast.error("Payment failed. " + response.error.description);
+    });
+    rzp.open();
+  };
 
   return (
     <div className="min-h-screen bg-ink text-cream relative overflow-hidden flex flex-col pt-24 pb-32">
@@ -142,7 +225,7 @@ const Plan = () => {
                     ))}
                   </ul>
 
-                  <button onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))} className={`mt-auto w-full py-4 text-center font-display tracking-[0.3em] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  <button onClick={() => handleCheckout(p.name, p.prices[posterFreq as keyof typeof p.prices])} className={`mt-auto w-full py-4 text-center font-display tracking-[0.3em] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
                     p.featured ? "bg-gold text-ink hover:bg-gold-bright hover:shadow-[0_0_20px_hsl(var(--gold)/0.5)]" : "border border-gold/40 text-cream hover:border-gold hover:bg-gold/10 hover:text-gold"
                   }`}>
                     GET STARTED <ArrowUpRight className="w-4 h-4" />
@@ -221,7 +304,7 @@ const Plan = () => {
                     ))}
                   </ul>
 
-                  <button onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))} className={`mt-auto w-full py-3.5 text-center font-display tracking-[0.2em] text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  <button onClick={() => handleCheckout(p.name, p.price)} className={`mt-auto w-full py-3.5 text-center font-display tracking-[0.2em] text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
                     p.featured ? "bg-gold text-ink hover:bg-gold-bright" : "border border-gold/40 text-cream hover:border-gold hover:text-gold hover:bg-gold/10"
                   }`}>
                     REQUEST QUOTE <ArrowUpRight className="w-3.5 h-3.5" />
@@ -254,6 +337,64 @@ const Plan = () => {
           </div>
         )}
       </div>
+
+      {/* Payment Modal */}
+      {paymentModalOpen && selectedPlan && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink/90 backdrop-blur-md" onClick={() => setPaymentModalOpen(false)} />
+          <div className="relative bg-ink-soft border border-gold/30 rounded-3xl w-full max-w-md p-8 shadow-[0_30px_100px_rgba(212,175,55,0.15)] animate-in zoom-in-95 duration-300">
+            <button onClick={() => setPaymentModalOpen(false)} className="absolute top-6 right-6 text-cream/50 hover:text-gold transition">
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              <span className="font-display tracking-widest text-emerald-400 text-sm">SECURE CHECKOUT</span>
+            </div>
+
+            <h3 className="font-serif-elegant text-2xl text-cream mb-2">{selectedPlan.name}</h3>
+            <div className="font-display text-4xl text-gold mb-6">
+              {discountPercent > 0 ? (
+                <div className="flex items-end gap-3">
+                  <span className="text-xl text-cream/30 line-through">₹{selectedPlan.numericPrice}</span>
+                  <span>₹{Math.round(selectedPlan.numericPrice * (1 - discountPercent / 100))}</span>
+                </div>
+              ) : (
+                <span>₹{selectedPlan.numericPrice}</span>
+              )}
+            </div>
+
+            <div className="mb-6 space-y-3">
+              <label className="text-xs font-display tracking-widest text-cream/60 uppercase">Promo Code</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="e.g. LUXURY20"
+                  className="flex-1 bg-ink border border-gold/20 rounded-lg px-4 py-3 text-sm text-cream placeholder:text-cream/30 focus:outline-none focus:border-gold transition-colors"
+                />
+                <button onClick={handleApplyPromo} className="px-6 py-3 bg-gold/10 text-gold border border-gold/30 rounded-lg text-xs font-display font-bold hover:bg-gold hover:text-ink transition">
+                  APPLY
+                </button>
+              </div>
+              {discountPercent > 0 && (
+                <p className="text-xs text-emerald-400">Promo code applied successfully.</p>
+              )}
+            </div>
+
+            <div className="h-px w-full bg-gold/10 mb-6" />
+
+            <button onClick={handlePayment} className="w-full py-4 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display font-bold tracking-widest rounded-xl shadow-[0_10px_30px_rgba(212,175,55,0.2)] hover:shadow-[0_10px_40px_rgba(212,175,55,0.4)] transition hover:-translate-y-1">
+              PAY SECURELY VIA RAZORPAY
+            </button>
+            
+            <p className="text-center text-[10px] text-cream/40 mt-4 flex items-center justify-center gap-1">
+              Payments are 100% encrypted & secure.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
