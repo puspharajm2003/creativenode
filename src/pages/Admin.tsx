@@ -59,7 +59,7 @@ const Admin = () => {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [activeWebsiteClientId, setActiveWebsiteClientId] = useState<string>("");
-  const [tab, setTab] = useState<"analytics" | "clients" | "websites" | "messages" | "billing">("analytics");
+  const [tab, setTab] = useState<"analytics" | "clients" | "websites" | "messages" | "billing" | "payments">("analytics");
   const [uploading, setUploading] = useState(false);
   const [uploadingWebsite, setUploadingWebsite] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
