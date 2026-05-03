@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Crown, Zap, Sparkles, X, ShieldCheck } from "lucide-react";
 import { AuthNavButton } from "@/components/AuthNavButton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Plan = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [pricingTab, setPricingTab] = useState<'posters' | 'websites'>('posters');
   const [posterFreq, setPosterFreq] = useState<'single' | 'weekly' | 'monthly'>('single');
 
@@ -16,6 +19,12 @@ const Plan = () => {
   const [discountPercent, setDiscountPercent] = useState(0);
 
   const handleCheckout = (planName: string, priceText: string) => {
+    if (!user) {
+      toast.error("Please log in to complete your payment");
+      navigate("/login");
+      return;
+    }
+
     // Extract numeric price (e.g. "₹1,999" -> 1999)
     const numericPrice = parseInt(priceText.replace(/[^0-9]/g, ''), 10);
     if (!numericPrice) {
@@ -94,10 +103,16 @@ const Plan = () => {
           currency: "INR",
           promo_code_used: discountPercent > 0 ? promoCode.toUpperCase() : null,
           plan_name: selectedPlan.name,
+          user_id: user?.id,
           status: "success"
         });
         
         // Dispatch event for chat or success route if needed
+      },
+      modal: {
+        ondismiss: function() {
+          toast.info("Payment not done. Please complete your payment to start your plan.");
+        }
       },
       theme: {
         color: "#D4AF37" // Luxury Gold theme

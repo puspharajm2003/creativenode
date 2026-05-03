@@ -269,6 +269,7 @@ export type Database = {
           promo_code_used: string | null
           plan_name: string | null
           status: string
+          user_id: string | null
           created_at: string
         }
         Insert: {
@@ -279,6 +280,7 @@ export type Database = {
           promo_code_used?: string | null
           plan_name?: string | null
           status?: string
+          user_id?: string | null
           created_at?: string
         }
         Update: {
@@ -289,6 +291,7 @@ export type Database = {
           promo_code_used?: string | null
           plan_name?: string | null
           status?: string
+          user_id?: string | null
           created_at?: string
         }
         Relationships: []
