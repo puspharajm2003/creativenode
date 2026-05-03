@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import jsPDF from "jspdf";
@@ -31,9 +31,17 @@ const Websites = () => {
   const [popupItem, setPopupItem] = useState<Poster | null>(null);
   const [popupAnimating, setPopupAnimating] = useState(false);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
+  
+  /* Filter settings */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentFilter = searchParams.get('filter') || 'all';
 
   const openPopup = (p: Poster) => {
     setPopupItem(p);
+    setIframeLoading(true);
+    setIframeError(false);
     setPopupVisible(true);
     requestAnimationFrame(() => setPopupAnimating(true));
   };
@@ -234,12 +242,18 @@ const Websites = () => {
         if (!track) return;
         const distance = () => track.scrollWidth - reel.clientWidth + 80;
         const tween = gsap.to(track, {
-          x: () => -distance(),
+          x: () => {
+            const d = distance();
+            return d > 0 ? -d : 0;
+          },
           ease: "none",
           scrollTrigger: {
             trigger: reel,
             start: "top top",
-            end: () => `+=${distance()}`,
+            end: () => {
+              const d = distance();
+              return `+=${d > 0 ? d : 1}`;
+            },
             pin: true,
             scrub: 1,
             invalidateOnRefresh: true,
@@ -265,7 +279,7 @@ const Websites = () => {
           }
         });
         gsap.from(reel.querySelectorAll(".reel-card"), {
-          opacity: 0, y: 60, duration: 0.8, ease: "power3.out", stagger: 0.05,
+          y: 60, duration: 0.8, ease: "power3.out", stagger: 0.05,
           scrollTrigger: { trigger: reel, start: "top 80%" },
         });
       });
@@ -281,7 +295,7 @@ const Websites = () => {
       ScrollTrigger.refresh();
     }, root);
     return () => ctx.revert();
-  }, [ready]);
+  }, [ready, currentFilter]);
 
   /* ── Skeleton shimmer keyframes (inline style) ── */
   const shimmerStyle = {
@@ -457,10 +471,31 @@ const Websites = () => {
         </div>
       </section>
 
+      {/* Filter Bar */}
+      <section className="py-6 flex justify-center gap-3 flex-wrap px-8 border-b border-gold/10 max-w-[1800px] mx-auto bg-ink sticky top-16 z-40">
+        <button
+          onClick={() => setSearchParams({ filter: 'all' })}
+          className={`px-5 py-2 rounded-full text-[10px] sm:text-xs font-display tracking-[0.2em] transition-all duration-300 ${currentFilter === 'all' ? 'bg-gold text-ink font-bold shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-ink border border-gold/30 text-cream/70 hover:border-gold hover:text-gold'}`}
+        >
+          ALL WEBSITES
+        </button>
+        {clients.filter(c => posters.some(p => p.client_id === c.id)).map(c => (
+          <button
+            key={c.id}
+            onClick={() => setSearchParams({ filter: c.id })}
+            className={`px-5 py-2 rounded-full text-[10px] sm:text-xs font-display tracking-[0.2em] transition-all duration-300 ${currentFilter === c.id ? 'bg-gold text-ink font-bold shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-ink border border-gold/30 text-cream/70 hover:border-gold hover:text-gold'}`}
+          >
+            {c.name.toUpperCase()}
+          </button>
+        ))}
+      </section>
+
       {/* Per-client reels */}
-      {clients.map((client, idx) => {
+      {clients
+        .filter(c => currentFilter === 'all' || c.id === currentFilter)
+        .filter(c => posters.some(p => p.client_id === c.id))
+        .map((client, idx) => {
         const list = posters.filter((p) => p.client_id === client.id);
-        if (list.length === 0) return null;
         return (
           <section key={client.id} className="reel relative h-screen overflow-hidden" id={`reel-${client.slug}`}>
             <div className="absolute inset-0 bg-gradient-to-b from-ink via-ink-soft/40 to-ink" />
@@ -487,16 +522,16 @@ const Websites = () => {
                 </div>
 
                 {/* Social / Custom Links */}
-                {(client.instagram_url || (list.length > 2 && client.custom_link_url)) && (
+                {(client.instagram_url || client.custom_link_url) && (
                   <div className="flex flex-col gap-3">
                     {client.instagram_url && (
                       <a href={client.instagram_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-3 border border-gold/30 text-cream/80 text-xs font-display tracking-widest hover:border-gold hover:text-gold rounded transition w-fit">
                         <Instagram className="w-3.5 h-3.5" /> FOLLOW ON INSTAGRAM
                       </a>
                     )}
-                    {(list.length > 2 && client.custom_link_url && client.custom_link_text) && (
+                    {client.custom_link_url && (
                       <a href={client.custom_link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold text-xs font-display tracking-widest rounded hover:opacity-90 transition w-fit">
-                        {client.custom_link_text.toUpperCase()} <ArrowUpRight className="w-3.5 h-3.5" />
+                        {(client.custom_link_text || "VISIT WEBSITE").toUpperCase()} <ArrowUpRight className="w-3.5 h-3.5" />
                       </a>
                     )}
                   </div>
@@ -511,67 +546,76 @@ const Websites = () => {
                   </div>
                 ) : (
                   list.map((p, i) => (
-                    <div key={p.id} onClick={() => openPopup(p)} className="reel-card relative shrink-0 w-[600px] aspect-video rounded-2xl overflow-hidden group border border-gold/10 hover:border-gold/40 transition-colors duration-500 shadow-2xl hover:shadow-[0_20px_50px_-10px_hsl(42_65%_50%_/_0.3)] cursor-pointer">
-                      {p.website_url ? (
-                        <div className="w-full h-full relative overflow-hidden">
-                          <iframe
-                            src={p.website_url}
-                            className="w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"
-                            style={{ transform: 'scale(0.5)' }}
-                            title={p.title ?? client.name}
+                    <div key={p.id} onClick={() => openPopup(p)} className="reel-card relative shrink-0 w-[700px] xl:w-[850px] aspect-video rounded-2xl overflow-hidden group border border-white/10 hover:border-white/30 transition-all duration-700 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:shadow-[0_30px_80px_rgba(212,175,55,0.15)] cursor-pointer bg-[#1c1c1e] transform hover:-translate-y-2">
+                      
+                      {/* Safari Browser Chrome */}
+                      <div className="absolute top-0 left-0 right-0 h-10 bg-[#2d2d2f] border-b border-white/5 flex items-center px-4 z-20">
+                        <div className="flex gap-2 z-10">
+                          <div className="w-3 h-3 rounded-full bg-[#ff5f57] border border-black/10" />
+                          <div className="w-3 h-3 rounded-full bg-[#febc2e] border border-black/10" />
+                          <div className="w-3 h-3 rounded-full bg-[#28c840] border border-black/10" />
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/30 rounded-md px-3 py-1 flex items-center gap-2 border border-white/5 shadow-inner">
+                            <Globe className="w-3 h-3 text-white/30" />
+                            <span className="text-[11px] text-white/50 font-mono tracking-tight">
+                              {p.website_url ? p.website_url.replace(/^https?:\/\//, '').split('/')[0] : (p.title || 'creativenode.in')}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="absolute right-4 text-[10px] font-display tracking-widest text-white/20">
+                          {String(i + 1).padStart(2, "0")} / {String(list.length).padStart(2, "0")}
+                        </div>
+                      </div>
+
+                      {/* Content Area */}
+                      <div className="absolute top-10 bottom-0 left-0 right-0 overflow-hidden bg-white z-10">
+                        {p.website_url ? (
+                          <div className="w-full h-full relative">
+                            <img
+                              src={`https://api.microlink.io/?url=${encodeURIComponent(p.website_url)}&screenshot=true&meta=false&embed=screenshot.url`}
+                              alt={p.title ?? client.name}
+                              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                              loading="lazy"
+                              onError={(e) => {
+                                // Fallback if microlink fails
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80';
+                              }}
+                            />
+                            {/* Inner shadow to blend nicely */}
+                            <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] pointer-events-none" />
+                          </div>
+                        ) : (
+                          <img
+                            src={PUBLIC_URL(p.image_path)}
+                            alt={p.title ?? client.name}
+                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             loading="lazy"
-                            sandbox="allow-scripts allow-same-origin"
                           />
-                        </div>
-                      ) : (
-                        <img
-                          src={PUBLIC_URL(p.image_path)}
-                          alt={p.title ?? client.name}
-                          className="w-full h-full object-cover scale-110 group-hover:scale-105 transition-transform duration-1000 ease-out"
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
-                      
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                        <div className="flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 text-white text-xs font-display tracking-widest">
-                          <Monitor className="w-3.5 h-3.5" /> OPEN PREVIEW
+                        )}
+                        <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/30 transition-colors duration-500 ease-out pointer-events-none" />
+                      </div>
+
+                      {/* Hover Overlay Button */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center z-30 pointer-events-none">
+                        <div className="flex items-center gap-3 px-6 py-3 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 text-white text-sm font-display tracking-[0.2em] shadow-[0_10px_40px_rgba(0,0,0,0.5)] translate-y-8 group-hover:translate-y-0 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+                          <Monitor className="w-4 h-4" /> LIVE PREVIEW
                         </div>
                       </div>
-                      
-                      <div className="absolute top-5 left-5 z-10 px-4 py-2 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
-                        <span className="font-display tracking-[0.3em] text-gold text-[10px] font-bold">{String(i + 1).padStart(2, "0")} / {String(list.length).padStart(2, "0")}</span>
-                      </div>
-                      
-                      {/* Website URL badge */}
-                      {p.website_url && (
-                        <div className="absolute top-5 right-5 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-ink/40 backdrop-blur-md border border-gold/20 rounded-full">
-                          <Globe className="w-3 h-3 text-gold" />
-                          <span className="font-mono text-[10px] text-cream/60 max-w-[120px] truncate">{new URL(p.website_url).hostname}</span>
-                        </div>
-                      )}
-                      
-                      <div className="absolute bottom-0 left-0 right-0 z-10 p-8 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                        <div className="flex items-center gap-3 text-xs font-display tracking-[0.4em] text-gold/90">
-                          <span className="px-3 py-1 bg-gold/10 border border-gold/30 rounded-full">WEBSITE</span>
-                          <span className="opacity-50">·</span>
-                          <span className="opacity-80">{client.name.toUpperCase()}</span>
+
+                      {/* Floating Title (Bottom Left) */}
+                      <div className="absolute bottom-6 left-6 z-30 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 delay-100 pointer-events-none">
+                        <div className="flex flex-col gap-1 drop-shadow-2xl">
+                          <span className="font-display tracking-[0.3em] text-white text-lg font-bold">{client.name.toUpperCase()}</span>
+                          <span className="font-serif-elegant italic text-white/70 text-sm">{p.title ?? "Website"}</span>
                         </div>
                       </div>
+
                     </div>
                   ))
                 )}
-                {/* End card */}
-                <div className="reel-card shrink-0 w-[400px] aspect-[4/5] flex flex-col items-center justify-center border border-dashed border-gold/30 rounded p-6 text-center">
-                  <span className="font-serif-elegant italic text-cream/50 mb-3">End of reel</span>
-                  <div className="font-display tracking-[0.4em] text-gold text-xs mb-6">{client.name.toUpperCase()}</div>
-                  {list.length > 2 && client.custom_link_url && client.custom_link_text && (
-                    <a href={client.custom_link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 bg-gold/10 border border-gold text-gold font-bold text-[10px] font-display tracking-widest rounded hover:bg-gold hover:text-ink transition">
-                      {client.custom_link_text.toUpperCase()} <ArrowUpRight className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
+                {/* Add a subtle padding block instead of the end card */}
+                <div className="shrink-0 w-32" />
               </div>
             </div>
           </section>
@@ -653,7 +697,18 @@ const Websites = () => {
             </div>
             <div className="bg-white rounded-b-2xl overflow-hidden border border-white/10 border-t-0 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]" style={{ height: '80vh' }}>
               {popupItem.website_url ? (
-                <iframe src={popupItem.website_url} className="w-full h-full border-0" title={popupItem.title ?? 'Website Preview'} sandbox="allow-scripts allow-same-origin allow-popups allow-forms" />
+                <div className="w-full h-full relative bg-ink flex items-center justify-center">
+                  {iframeLoading && !iframeError && <Loader2 className="w-8 h-8 animate-spin text-gold absolute z-10" />}
+                  {iframeError && <div className="absolute z-10 text-red-500 font-display tracking-widest text-sm flex flex-col items-center gap-2"><Globe className="w-8 h-8 opacity-50" /> Failed to load preview</div>}
+                  <iframe 
+                    src={popupItem.website_url} 
+                    className={`w-full h-full border-0 transition-opacity duration-500 relative z-20 ${iframeLoading ? 'opacity-0' : 'opacity-100'}`} 
+                    title={popupItem.title ?? 'Website Preview'} 
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                    onLoad={() => setIframeLoading(false)}
+                    onError={() => { setIframeLoading(false); setIframeError(true); }}
+                  />
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-ink">
                   <img src={PUBLIC_URL(popupItem.image_path)} alt={popupItem.title ?? 'Website'} className="max-w-full max-h-full object-contain" />

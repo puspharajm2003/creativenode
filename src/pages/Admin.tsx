@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import jsPDF from "jspdf";
 import {
   LogOut, Upload, Trash2, Loader2, Plus, ImagePlus, ExternalLink,
   Eye, EyeOff, GripVertical, MessageSquare, Receipt, LayoutGrid, Activity,
   X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft, Phone, CheckCircle2,
-  Globe, Pencil, Monitor, Maximize2, Minimize2
+  Globe, Pencil, Monitor, Maximize2, Minimize2, Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { Billing } from "@/components/admin/Billing";
@@ -93,6 +94,147 @@ const Admin = () => {
     if (error) return toast.error(error.message);
     toast.success("URL saved");
     setWebsites(prev => prev.map(x => x.id === w.id ? { ...x, website_url: url } : x));
+  };
+
+  /* ── Generate one-page confirmation receipt PDF ── */
+  const generateReceiptPDF = (data: { name: string; email: string; business: string; plan: string; posters: string; price: string; date: string }) => {
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const w = pdf.internal.pageSize.getWidth();
+
+    // Dark background
+    pdf.setFillColor(10, 10, 10);
+    pdf.rect(0, 0, w, 842, "F");
+
+    // Gold header line
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(2);
+    pdf.line(40, 50, w - 40, 50);
+
+    // CREATIVENODE
+    pdf.setTextColor(212, 175, 55);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text("CREATIVENODE", 40, 40);
+
+    // Receipt title
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text("CONFIRMATION RECEIPT", w - 40, 40, { align: "right" });
+
+    // Date
+    pdf.setFontSize(9);
+    pdf.text(data.date, w - 40, 70, { align: "right" });
+
+    // Client details
+    pdf.setTextColor(230, 220, 200);
+    pdf.setFontSize(11);
+    let y = 100;
+    const label = (l: string, v: string) => {
+      pdf.setTextColor(150, 150, 150);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(l.toUpperCase(), 40, y);
+      pdf.setTextColor(230, 220, 200);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text(v, 40, y + 16);
+      y += 40;
+    };
+    label("Name", data.name);
+    label("Email", data.email);
+    label("Business", data.business);
+
+    // Divider
+    y += 10;
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(0.5);
+    pdf.line(40, y, w - 40, y);
+    y += 30;
+
+    // Plan box
+    pdf.setFillColor(20, 20, 20);
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(1);
+    pdf.rect(40, y, w - 80, 120, "FD");
+
+    pdf.setTextColor(212, 175, 55);
+    pdf.setFontSize(10);
+    pdf.text("SELECTED PLAN", 60, y + 25);
+    pdf.setTextColor(230, 220, 200);
+    pdf.setFontSize(22);
+    pdf.text(data.plan, 60, y + 55);
+    pdf.setFontSize(14);
+    pdf.setTextColor(212, 175, 55);
+    pdf.text(data.price, 60, y + 80);
+    pdf.setTextColor(150, 150, 150);
+    pdf.setFontSize(10);
+    pdf.text(data.posters, 60, y + 100);
+
+    y += 160;
+
+    // Footer
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("This is a confirmation of your interest. Final pricing may vary based on project scope.", 40, y);
+    pdf.text("Contact: +91 6369278905  |  hello@creativenode.in", 40, y + 16);
+
+    // Bottom gold line
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(2);
+    pdf.line(40, 810, w - 40, 810);
+
+    return pdf;
+  };
+
+  const downloadReceiptAdmin = (m: ContactMessage) => {
+    const planMatch = m.message.match(/Selected Plan: (.+?)\n/);
+    const postersMatch = m.message.match(/Posters: (.+?)\n/);
+    const priceMatch = m.message.match(/Total Price: (.+?)\n/);
+    const businessMatch = m.message.match(/Business Type: (.+?)\n/);
+    
+    if (!planMatch) {
+      toast.error("Could not parse receipt details from message.");
+      return;
+    }
+
+    const pdf = generateReceiptPDF({
+      name: m.name,
+      email: m.email,
+      business: businessMatch ? businessMatch[1] : "N/A",
+      plan: planMatch[1],
+      posters: postersMatch ? postersMatch[1] : "N/A",
+      price: priceMatch ? priceMatch[1] : "N/A",
+      date: new Date(m.created_at).toLocaleString(),
+    });
+    pdf.save(`creativenode-receipt-${m.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
+    toast.success("Receipt downloaded");
+  };
+
+  const retryWhatsApp = async (m: ContactMessage) => {
+    const waTextMatch = m.message.match(/── WhatsApp Delivery Text ──\n([\s\S]*?)\n\n── WhatsApp Status ──/);
+    if (!waTextMatch) return toast.error("Could not find WhatsApp text in record.");
+    const waText = waTextMatch[1].trim();
+
+    const retryMatch = m.message.match(/Retry attempts: (\d+)/);
+    const currentRetries = retryMatch ? parseInt(retryMatch[1], 10) : 0;
+    const newRetries = currentRetries + 1;
+
+    let newMessage = m.message;
+    if (newMessage.includes('Retry attempts:')) {
+      newMessage = newMessage.replace(/Retry attempts: \d+/, `Retry attempts: ${newRetries}`);
+    } else {
+      newMessage += `\nRetry attempts: ${newRetries}`;
+    }
+
+    newMessage = newMessage.replace(/Status: \w+/, "Status: FAILED");
+
+    const { error } = await supabase.from("contact_messages").update({ message: newMessage }).eq("id", m.id);
+    if (error) return toast.error("Failed to update retry status.");
+    
+    setMessages(prev => prev.map(x => x.id === m.id ? { ...x, message: newMessage } : x));
+    window.open(`https://wa.me/916369278905?text=${encodeURIComponent(waText)}`, "_blank");
+    toast.success("WhatsApp opened. Status marked as FAILED.");
   };
 
   /* Edit website title */
@@ -281,6 +423,32 @@ const Admin = () => {
     } finally {
       setUploadingWebsite(false);
       if (websiteFileRef.current) websiteFileRef.current.value = "";
+    }
+  };
+
+  const onAddWebsiteLink = async () => {
+    if (!activeWebClient) return;
+    const url = window.prompt("Enter website URL (e.g. https://example.com):");
+    if (!url) return;
+    try {
+      let validUrl = url;
+      if (!validUrl.startsWith("http")) validUrl = "https://" + validUrl;
+      const domain = new URL(validUrl).hostname;
+      
+      const max = activeWebsiteItems.reduce((m, w) => Math.max(m, w.sort_order), 0);
+      const { error: insErr } = await supabase.from("client_websites").insert({
+        client_id: activeWebClient.id, 
+        image_path: `link-only-${crypto.randomUUID()}`, 
+        title: domain, 
+        sort_order: max + 1,
+        website_url: validUrl
+      } as any);
+      
+      if (insErr) throw insErr;
+      toast.success("Website link added");
+      load();
+    } catch (e: any) {
+      toast.error(e.message ?? "Invalid URL or failed to save");
     }
   };
 
@@ -528,11 +696,20 @@ const Admin = () => {
                       Drag screenshots to reorder · Click eye to approve / hide · Add URL for live preview
                     </p>
                   </div>
-                  <label className="cursor-pointer flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display tracking-[0.2em] text-sm font-bold rounded hover:opacity-90 transition">
-                    {uploadingWebsite ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    UPLOAD SCREENSHOT
-                    <input ref={websiteFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUploadWebsite(e.target.files)} />
-                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={onAddWebsiteLink}
+                      className="flex items-center gap-2 px-5 py-3 border border-gold/40 text-gold font-display tracking-[0.2em] text-sm font-bold rounded hover:bg-gold/10 transition"
+                    >
+                      <Globe className="w-4 h-4" />
+                      ADD LINK
+                    </button>
+                    <label className="cursor-pointer flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-display tracking-[0.2em] text-sm font-bold rounded hover:opacity-90 transition">
+                      {uploadingWebsite ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      UPLOAD SCREENSHOT
+                      <input ref={websiteFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUploadWebsite(e.target.files)} />
+                    </label>
+                  </div>
                 </div>
 
                 {activeWebsiteItems.length === 0 ? (
@@ -651,6 +828,8 @@ const Admin = () => {
                 const waStatus = waStatusMatch ? waStatusMatch[1] : null;
                 const waTimeMatch = m.message.match(/Redirect initiated: (.+?)\n/);
                 const waTime = waTimeMatch ? waTimeMatch[1] : null;
+                const retryMatch = m.message.match(/Retry attempts: (\d+)/);
+                const retryCount = retryMatch ? parseInt(retryMatch[1], 10) : 0;
                 /* Parse selected plan */
                 const planMatch = m.message.match(/Selected Plan: (.+?)\n/);
                 const planName = planMatch ? planMatch[1] : null;
@@ -703,6 +882,41 @@ const Admin = () => {
                       </div>
                     </div>
                     <p className="text-cream/80 whitespace-pre-wrap font-serif-elegant text-lg leading-relaxed">{m.message}</p>
+                    
+                    {/* WhatsApp timeline */}
+                    {isWaLead && (
+                      <div className="mt-4 p-4 bg-ink-soft/40 border border-gold/10 rounded-lg text-xs space-y-2 font-mono text-cream/70">
+                        <div className="text-gold font-display tracking-widest uppercase mb-3 flex items-center gap-2">
+                          <Phone className="w-4 h-4" /> WhatsApp Delivery Timeline
+                        </div>
+                        <div className="flex justify-between items-center py-1">
+                          <span>CRM Record Saved:</span>
+                          <span className="text-cream/90">{new Date(m.created_at).toLocaleString()}</span>
+                        </div>
+                        {waTime && (
+                          <div className="flex justify-between items-center py-1">
+                            <span>Initial WA Redirect:</span>
+                            <span className="text-cream/90">{new Date(waTime).toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center py-1">
+                          <span>Current Status:</span>
+                          <span className={waStatus === 'FAILED' ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>{waStatus}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-gold/10 pt-3 mt-1">
+                          <span>Retry attempts:</span>
+                          <span className="text-cream/90 font-bold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">{retryCount}</span>
+                        </div>
+                        <div className="flex gap-3 pt-4 border-t border-gold/10 mt-2">
+                          <button onClick={() => retryWhatsApp(m)} className="flex-1 flex justify-center items-center gap-2 px-3 py-2 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold font-display tracking-widest rounded hover:opacity-90 transition">
+                            <Phone className="w-3.5 h-3.5 text-ink" /> RETRY WHATSAPP
+                          </button>
+                          <button onClick={() => downloadReceiptAdmin(m)} className="flex-1 flex justify-center items-center gap-2 px-3 py-2 border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest transition">
+                            <Download className="w-3.5 h-3.5" /> RECEIPT PDF
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
