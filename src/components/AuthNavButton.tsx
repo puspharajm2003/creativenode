@@ -11,7 +11,7 @@ export const AuthNavButton = ({ className = "" }: AuthNavButtonProps) => {
 
   return (
     <Link
-      to="/profile"
+      to={isLoggedIn ? "/profile" : "/login"}
       className={className}
       aria-label={isLoggedIn ? "Profile" : "Login/Signup"}
     >

@@ -27,9 +27,9 @@ const Login = () => {
     const tl = gsap.timeline();
     
     tl.to(formRef.current, {
-      y: 20,
+      x: isLogin ? -30 : 30,
       opacity: 0,
-      duration: 0.3,
+      duration: 0.4,
       ease: "power2.in",
       onComplete: () => {
         setIsLogin(!isLogin);
@@ -39,8 +39,8 @@ const Login = () => {
     });
     
     tl.fromTo(formRef.current, 
-      { y: -20, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }
+      { x: isLogin ? 30 : -30, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.6, ease: "power3.out" }
     );
   };
 
@@ -93,10 +93,10 @@ const Login = () => {
           </div>
           
           <h1 className="font-display text-5xl font-black mb-3 tracking-tight">
-            {isLogin ? "Admin Access" : "Join the Node"}
+            {isLogin ? "Studio Access" : "Join the Collective"}
           </h1>
           <p className="font-serif-elegant italic text-cream/40 text-lg">
-            {isLogin ? "Sign in to manage your client gallery" : "Create an account to start your journey"}
+            {isLogin ? "Sign in to manage your workstation" : "Create an account to start your journey"}
           </p>
         </div>
 
