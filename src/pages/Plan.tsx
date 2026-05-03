@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Crown, Zap, Sparkles, X, ShieldCheck } from "lucide-react";
 import { AuthNavButton } from "@/components/AuthNavButton";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const Plan = () => {
   const [pricingTab, setPricingTab] = useState<'posters' | 'websites'>('posters');
@@ -28,17 +29,26 @@ const Plan = () => {
     setPaymentModalOpen(true);
   };
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoCode.trim().toUpperCase();
-    if (code === "CREATIVE10") {
-      setDiscountPercent(10);
-      toast.success("Promo code applied! 10% OFF.");
-    } else if (code === "LUXURY20") {
-      setDiscountPercent(20);
-      toast.success("Promo code applied! 20% OFF.");
-    } else {
+    if (!code) {
+      toast.error("Please enter a promo code");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("promo_codes")
+      .select("*")
+      .eq("code", code)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !data) {
       setDiscountPercent(0);
-      toast.error("Invalid Promo Code");
+      toast.error("Invalid or expired Promo Code");
+    } else {
+      setDiscountPercent(data.discount_percent);
+      toast.success(`Promo code applied! ${data.discount_percent}% OFF.`);
     }
   };
 
@@ -73,9 +83,20 @@ const Plan = () => {
       name: "CreativeNode",
       description: `Purchase: ${selectedPlan.name}`,
       image: "/favicon.jpg",
-      handler: function (response: any) {
+      handler: async function (response: any) {
         toast.success(`Payment Successful! Transaction ID: ${response.razorpay_payment_id}`);
         setPaymentModalOpen(false);
+        
+        // Record payment in Supabase
+        await supabase.from("payments").insert({
+          payment_id: response.razorpay_payment_id,
+          amount_received: finalPrice,
+          currency: "INR",
+          promo_code_used: discountPercent > 0 ? promoCode.toUpperCase() : null,
+          plan_name: selectedPlan.name,
+          status: "success"
+        });
+        
         // Dispatch event for chat or success route if needed
       },
       theme: {

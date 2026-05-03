@@ -260,6 +260,64 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          id: string
+          payment_id: string
+          amount_received: number
+          currency: string
+          promo_code_used: string | null
+          plan_name: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          payment_id: string
+          amount_received: number
+          currency?: string
+          promo_code_used?: string | null
+          plan_name?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          payment_id?: string
+          amount_received?: number
+          currency?: string
+          promo_code_used?: string | null
+          plan_name?: string | null
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          id: string
+          code: string
+          discount_percent: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          discount_percent: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          discount_percent?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+
       user_roles: {
         Row: {
           created_at: string

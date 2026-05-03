@@ -7,11 +7,12 @@ import {
   LogOut, Upload, Trash2, Loader2, Plus, ImagePlus, ExternalLink,
   Eye, EyeOff, GripVertical, MessageSquare, Receipt, LayoutGrid, Activity,
   X, Link as LinkIcon, Instagram, Palette, Type, AlignLeft, Phone, CheckCircle2,
-  Globe, Pencil, Monitor, Maximize2, Minimize2, Download
+  Globe, Pencil, Monitor, Maximize2, Minimize2, Download, CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { Billing } from "@/components/admin/Billing";
 import { Analytics } from "@/components/admin/Analytics";
+import { Payments } from "@/components/admin/Payments";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, DragEndEvent,
@@ -518,10 +519,10 @@ const Admin = () => {
 
       {/* Tabs */}
       <div className="border-b border-gold/15 bg-ink-soft/40 px-6 flex gap-2">
-        {(["analytics", "clients", "websites", "messages", "billing"] as const).map((t) => (
+        {(["analytics", "clients", "websites", "messages", "billing", "payments"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setTab(t as any)}
             className={`px-4 py-3 text-xs font-display tracking-[0.3em] border-b-2 transition flex items-center gap-2 ${
               tab === t ? "border-gold text-gold" : "border-transparent text-cream/60 hover:text-cream"
             }`}
@@ -530,6 +531,7 @@ const Admin = () => {
             {t === "messages" && <MessageSquare className="w-3.5 h-3.5" />}
             {t === "billing" && <Receipt className="w-3.5 h-3.5" />}
             {t === "websites" && <LayoutGrid className="w-3.5 h-3.5" />}
+            {t === "payments" && <CreditCard className="w-3.5 h-3.5" />}
             {t.toUpperCase()}
             {t === "messages" && unreadCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-gold text-ink rounded-full font-bold">{unreadCount}</span>
@@ -540,6 +542,8 @@ const Admin = () => {
 
       {tab === "analytics" ? (
         <Analytics />
+      ) : tab === "payments" ? (
+        <Payments />
       ) : tab === "billing" ? (
         <Billing />
       ) : tab === "clients" ? (
