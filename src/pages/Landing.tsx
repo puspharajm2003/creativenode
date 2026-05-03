@@ -367,7 +367,7 @@ const Landing = () => {
                          </li>
                       ))}
                     </ul>
-                    <Link to="/pricing" className={`mt-10 block w-full py-3 text-center font-display tracking-[0.2em] text-xs rounded transition-all ${
+                    <Link to="/plan" className={`mt-10 block w-full py-3 text-center font-display tracking-[0.2em] text-xs rounded transition-all ${
                       p.featured ? "bg-gold text-ink font-bold hover:bg-gold-bright" : "border border-gold/40 text-cream hover:border-gold hover:text-gold"
                     }`}>
                       SELECT PLAN
@@ -437,7 +437,7 @@ const Landing = () => {
                          </li>
                       ))}
                     </ul>
-                    <Link to="/pricing" className={`mt-auto block w-full py-3 text-center font-display tracking-[0.2em] text-xs rounded transition-all ${
+                    <Link to="/plan" className={`mt-auto block w-full py-3 text-center font-display tracking-[0.2em] text-xs rounded transition-all ${
                       p.featured ? "bg-gold text-ink font-bold hover:bg-gold-bright" : "border border-gold/40 text-cream hover:border-gold hover:text-gold"
                     }`}>
                       GET A QUOTE
