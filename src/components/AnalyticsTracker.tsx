@@ -22,6 +22,14 @@ export const AnalyticsTracker = () => {
         return;
       }
 
+      // Track Google Analytics pageview for SPA routing
+      if (typeof window !== "undefined" && typeof (window as any).gtag === "function") {
+        (window as any).gtag("event", "page_view", {
+          page_path: location.pathname + location.search,
+          page_location: window.location.href,
+        });
+      }
+
       try {
         const { error } = await supabase.from("page_views").insert({
           path: location.pathname,
@@ -39,7 +47,7 @@ export const AnalyticsTracker = () => {
     };
 
     trackPageview();
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   return null;
 };
