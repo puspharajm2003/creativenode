@@ -16,6 +16,7 @@ import Plan from "./pages/Plan.tsx";
 import Login from "./pages/Login.tsx";
 import UserProfile from "./pages/UserProfile.tsx";
 import Admin from "./pages/Admin.tsx";
+import Collections from "./pages/Collections.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/plan" element={<Plan />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<UserProfile />} />
+            <Route path="/collections" element={<Collections />} />
             <Route path="/admin" element={<ProtectedAdmin><Admin /></ProtectedAdmin>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
