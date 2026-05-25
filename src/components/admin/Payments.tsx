@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CreditCard, Tag, Plus, Loader2, Search, CheckCircle2, X } from "lucide-react";
+import { CreditCard, Tag, Plus, Loader2, Search, CheckCircle2, X, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import jsPDF from "jspdf";
 
 interface PromoCode {
   id: string;
@@ -32,6 +33,101 @@ export const Payments = () => {
   const [showPromoForm, setShowPromoForm] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newDiscount, setNewDiscount] = useState("");
+
+  const downloadReceipt = (payment: Payment) => {
+    try {
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const w = doc.internal.pageSize.getWidth();
+
+      // Dark background
+      doc.setFillColor(10, 10, 10);
+      doc.rect(0, 0, w, 842, "F");
+
+      // Gold header line
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(2);
+      doc.line(40, 50, w - 40, 50);
+
+      // CREATIVENODE
+      doc.setTextColor(212, 175, 55);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("CREATIVENODE", 40, 40);
+
+      // Receipt title
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text("OFFICIAL TRANSACTION RECEIPT", w - 40, 40, { align: "right" });
+
+      // Date
+      doc.setFontSize(9);
+      doc.text(new Date(payment.created_at).toLocaleString(), w - 40, 70, { align: "right" });
+
+      // Client details
+      doc.setTextColor(230, 220, 200);
+      doc.setFontSize(11);
+      let y = 100;
+      const label = (l: string, v: string) => {
+        doc.setTextColor(150, 150, 150);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(l.toUpperCase(), 40, y);
+        doc.setTextColor(230, 220, 200);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(v, 40, y + 16);
+        y += 45;
+      };
+      label("Client Name", "Valued Client");
+      label("Transaction ID", payment.payment_id);
+
+      // Divider
+      y += 10;
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(0.5);
+      doc.line(40, y, w - 40, y);
+      y += 30;
+
+      // Plan box
+      doc.setFillColor(20, 20, 20);
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(1);
+      doc.rect(40, y, w - 80, 120, "FD");
+
+      doc.setTextColor(212, 175, 55);
+      doc.setFontSize(10);
+      doc.text("ACTIVATED PLAN", 60, y + 25);
+      doc.setTextColor(230, 220, 200);
+      doc.setFontSize(22);
+      doc.text(payment.plan_name || 'N/A', 60, y + 55);
+      doc.setFontSize(14);
+      doc.setTextColor(212, 175, 55);
+      doc.text(`Amount Paid: INR ${payment.amount_received.toLocaleString('en-IN')}`, 60, y + 80);
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(10);
+      doc.text("Status: PAID VIA RAZORPAY", 60, y + 100);
+
+      y += 170;
+
+      // Footer
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("This receipt confirms your transaction. Thank you for choosing luxury engineering.", 40, y);
+      doc.text("Support Contact: +91 6369278905  ·  @creativenode.in", 40, y + 16);
+
+      // Bottom gold line
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(2);
+      doc.line(40, 810, w - 40, 810);
+
+      doc.save(`creativenode-receipt-${payment.payment_id}.pdf`);
+      toast.success("Receipt PDF downloaded!");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Failed to generate PDF");
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -209,13 +305,14 @@ export const Payments = () => {
                   <th className="px-6 py-4 font-display tracking-widest">Plan</th>
                   <th className="px-6 py-4 font-display tracking-widest">Amount</th>
                   <th className="px-6 py-4 font-display tracking-widest">Promo</th>
-                  <th className="px-6 py-4 font-display tracking-widest text-right">Status</th>
+                  <th className="px-6 py-4 font-display tracking-widest">Status</th>
+                  <th className="px-6 py-4 font-display tracking-widest text-right">Receipt</th>
                 </tr>
               </thead>
               <tbody>
                 {payments.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-cream/40 font-serif-elegant italic">
+                    <td colSpan={7} className="px-6 py-8 text-center text-cream/40 font-serif-elegant italic">
                       No payments recorded yet. Wait for a user to complete checkout.
                     </td>
                   </tr>
@@ -243,10 +340,19 @@ export const Payments = () => {
                           <span className="text-cream/20">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-display tracking-widest border border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
                           <CheckCircle2 className="w-3 h-3" /> {payment.status.toUpperCase()}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => downloadReceipt(payment)}
+                          className="w-8 h-8 rounded border border-gold/30 hover:border-gold hover:text-gold flex items-center justify-center inline-flex transition"
+                          title="Download Receipt"
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))

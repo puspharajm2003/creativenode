@@ -172,7 +172,7 @@ export const ContactForm = ({ variant = "dark", className = "" }: Props) => {
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.text("This is a confirmation of your interest. Final pricing may vary based on project scope.", 40, y);
-    pdf.text("Contact: +91 6369278905  |  hello@creativenode.in", 40, y + 16);
+    pdf.text("Contact: +91 6369278905", 40, y + 16);
 
     // Bottom gold line
     pdf.setDrawColor(212, 175, 55);
@@ -240,7 +240,7 @@ export const ContactForm = ({ variant = "dark", className = "" }: Props) => {
     pdf.text("Start Today.", pw / 2, 140, { align: "center" });
     pdf.setTextColor(200, 195, 180);
     pdf.setFontSize(14);
-    pdf.text("+91 6369278905  |  hello@creativenode.in", pw / 2, 200, { align: "center" });
+    pdf.text("+91 6369278905", pw / 2, 200, { align: "center" });
 
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);

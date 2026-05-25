@@ -5,6 +5,7 @@ import { AuthNavButton } from "@/components/AuthNavButton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import jsPDF from "jspdf";
 
 const Plan = () => {
   const { user } = useAuth();
@@ -75,6 +76,96 @@ const Plan = () => {
     });
   };
 
+  const generateInvoicePDF = (data: { name: string; email: string; plan: string; price: string; date: string; txId: string }) => {
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const w = pdf.internal.pageSize.getWidth();
+
+    // Dark background
+    pdf.setFillColor(10, 10, 10);
+    pdf.rect(0, 0, w, 842, "F");
+
+    // Gold header line
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(2);
+    pdf.line(40, 50, w - 40, 50);
+
+    // CREATIVENODE
+    pdf.setTextColor(212, 175, 55);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text("CREATIVENODE", 40, 40);
+
+    // Receipt title
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text("OFFICIAL TRANSACTION RECEIPT", w - 40, 40, { align: "right" });
+
+    // Date
+    pdf.setFontSize(9);
+    pdf.text(data.date, w - 40, 70, { align: "right" });
+
+    // Client details
+    pdf.setTextColor(230, 220, 200);
+    pdf.setFontSize(11);
+    let y = 100;
+    const label = (l: string, v: string) => {
+      pdf.setTextColor(150, 150, 150);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(l.toUpperCase(), 40, y);
+      pdf.setTextColor(230, 220, 200);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text(v, 40, y + 16);
+      y += 45;
+    };
+    label("Client Name", data.name);
+    label("Email Address", data.email);
+    label("Transaction ID", data.txId);
+
+    // Divider
+    y += 10;
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(0.5);
+    pdf.line(40, y, w - 40, y);
+    y += 30;
+
+    // Plan box
+    pdf.setFillColor(20, 20, 20);
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(1);
+    pdf.rect(40, y, w - 80, 120, "FD");
+
+    pdf.setTextColor(212, 175, 55);
+    pdf.setFontSize(10);
+    pdf.text("ACTIVATED PLAN", 60, y + 25);
+    pdf.setTextColor(230, 220, 200);
+    pdf.setFontSize(22);
+    pdf.text(data.plan, 60, y + 55);
+    pdf.setFontSize(14);
+    pdf.setTextColor(212, 175, 55);
+    pdf.text(`Amount Paid: ${data.price}`, 60, y + 80);
+    pdf.setTextColor(150, 150, 150);
+    pdf.setFontSize(10);
+    pdf.text("Status: PAID VIA RAZORPAY", 60, y + 100);
+
+    y += 170;
+
+    // Footer
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("This receipt confirms your transaction. Thank you for choosing luxury engineering.", 40, y);
+    pdf.text("Support Contact: +91 6369278905  ·  @creativenode.in", 40, y + 16);
+
+    // Bottom gold line
+    pdf.setDrawColor(212, 175, 55);
+    pdf.setLineWidth(2);
+    pdf.line(40, 810, w - 40, 810);
+
+    return pdf;
+  };
+
   const handlePayment = async () => {
     if (!selectedPlan) return;
     const isLoaded = await loadRazorpayScript();
@@ -107,7 +198,23 @@ const Plan = () => {
           status: "success"
         });
         
-        // Dispatch event for chat or success route if needed
+        // Trigger automatic receipt PDF download
+        try {
+          const clientName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Valued Client";
+          const receipt = generateInvoicePDF({
+            name: clientName,
+            email: user?.email || "",
+            plan: selectedPlan.name,
+            price: `INR ${finalPrice.toLocaleString()}`,
+            date: new Date().toLocaleString(),
+            txId: response.razorpay_payment_id
+          });
+          receipt.save(`creativenode-receipt-${response.razorpay_payment_id}.pdf`);
+          toast.success("Receipt downloaded automatically!");
+        } catch (e: any) {
+          console.error("PDF download failed:", e);
+          toast.error("Failed to trigger automatic download.");
+        }
       },
       modal: {
         ondismiss: function() {
@@ -141,6 +248,7 @@ const Plan = () => {
           <div className="hidden md:flex items-center gap-8 text-xs font-display tracking-[0.3em] text-cream/70">
             <Link to="/" className="hover:text-gold transition">HOME</Link>
             <Link to="/clients" className="hover:text-gold transition">WORK</Link>
+            <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
             <AuthNavButton className="px-3 py-1.5 border border-gold/40 hover:border-gold hover:text-gold rounded" />
           </div>
         </div>

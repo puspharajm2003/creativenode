@@ -13,6 +13,7 @@ export const Chatbot = () => {
     }
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [savedRecommendation, setSavedRecommendation] = useState<any>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -46,53 +47,79 @@ export const Chatbot = () => {
     return () => window.removeEventListener("nova-recommendation", handler);
   }, []);
 
-  const handleSend = (userMsgText: string) => {
-    if (!userMsgText.trim()) return;
+  const handleSend = async (userMsgText: string) => {
+    if (!userMsgText.trim() || isLoading) return;
 
+    const newUserMsg: Message = { role: "user", content: userMsgText };
     setMessages(prev => prev.map(m => ({ ...m, quickReplies: [] }))); // remove quick replies
-    setMessages(prev => [...prev, { role: "user", content: userMsgText }]);
+    setMessages(prev => [...prev, newUserMsg]);
     setInput("");
+    setIsLoading(true);
 
-    setTimeout(() => {
-      let aiResponse = "";
-      let card: any = null;
+    try {
+      const response = await fetch(import.meta.env.VITE_OPENROUTER_BASE_URL + "/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Creativenode AI",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: import.meta.env.VITE_OPENROUTER_MODEL,
+          messages: [
+            {
+              role: "system",
+              content: `You are Nova, the AI assistant for Creativenode, a premium design agency. 
+              Be professional, creative, and luxury-focused. 
+              Our services: 
+              1. Basic Package (₹1,999): 5 Posters/Week, premium layouts.
+              2. Standard Package (₹3,999): 24 Posters/Month, unlimited revisions, + Free Festival Poster.
+              3. Pro Package (₹9,999): 24 Posters/Month, 3D elements, ultra HD, Source files.
+              
+              ${savedRecommendation ? `The user has a current recommendation: 
+              - Name: ${savedRecommendation.name}
+              - Business: ${savedRecommendation.businessType}
+              - Need: ${savedRecommendation.posterSize}
+              - Recommended Plan: ${savedRecommendation.recommendedPlan}
+              - Price: ${savedRecommendation.totalPrice}` : ""}
+
+              Always encourage users to connect on WhatsApp for final details. 
+              Keep responses concise and helpful. 
+              If the user mentions a business type, give creative design suggestions.`
+            },
+            ...messages.map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: userMsgText }
+          ]
+        })
+      });
+
+      const data = await response.json();
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error("Invalid API response structure from OpenRouter/OpenAI");
+      }
+      if (data.choices[0].message.refusal) {
+        throw new Error(`OpenAI model request refused: ${data.choices[0].message.refusal}`);
+      }
+      const aiResponse = data.choices[0].message.content || "I couldn't generate a response.";
+      
       let quickReplies: string[] = [];
-      const lower = userMsgText.toLowerCase();
-
-      if (lower.includes("package") || lower.includes("price") || lower.includes("cost") || lower.includes("show me") || lower.includes("plan") || lower.includes("quote")) {
-        if (savedRecommendation) {
-          aiResponse = "Based on the details you just submitted, here is the customized plan we recommend for you:";
-          card = { 
-            title: savedRecommendation.recommendedPlan, 
-            posters: savedRecommendation.postersCount, 
-            price: savedRecommendation.totalPrice, 
-            highlight: "Recommended for your business" 
-          };
-          quickReplies = ["Connect on WhatsApp"];
-        } else {
-          aiResponse = "We have three main tiers depending on the quality and volume you need. Which design quality are you looking for?";
-          quickReplies = ["Basic Design", "Standard Design", "Professional Design"];
-        }
-      } else if (lower.includes("basic")) {
-        aiResponse = "Our Basic Plan is great for simple, high-quality layouts.";
-        card = { title: "Basic Package", posters: "5 Posters / Week", price: "₹1,999" };
-        quickReplies = ["Let's start!", "What about Standard?"];
-      } else if (lower.includes("standard")) {
-        aiResponse = "The Standard Plan gives you premium layouts with unlimited revisions.";
-        card = { title: "Standard Package", posters: "24 Posters / Month", price: "₹3,999", highlight: "+ Free Festival Poster" };
-        quickReplies = ["I want the Standard plan", "What about Professional?"];
-      } else if (lower.includes("professional") || lower.includes("pro")) {
-        aiResponse = "Professional Design includes 3D elements, ultra HD, and full source files.";
-        card = { title: "Pro Package", posters: "24 Posters / Month", price: "₹9,999", highlight: "Full Source Files" };
-        quickReplies = ["Let's do Professional", "Actually, Standard is fine"];
-      } else if (lower.includes("start") || lower.includes("want") || lower.includes("yes") || lower.includes("hire") || lower.includes("fine") || lower.includes("connect")) {
-        aiResponse = "Perfect! Let's get your project started. Reach out to our human team on WhatsApp to finalize the details.";
-      } else {
-        aiResponse = "Thanks for your message! To get accurate details, please message our team on WhatsApp.";
+      if (aiResponse.toLowerCase().includes("whatsapp") || aiResponse.toLowerCase().includes("connect")) {
+        quickReplies = ["Connect on WhatsApp"];
+      } else if (aiResponse.toLowerCase().includes("package") || aiResponse.toLowerCase().includes("price")) {
+        quickReplies = ["Basic Design", "Standard Design", "Professional Design"];
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: aiResponse, card, quickReplies }]);
-    }, 600);
+      setMessages(prev => [...prev, { role: "assistant", content: aiResponse, quickReplies }]);
+    } catch (error) {
+      console.error("OpenRouter Error:", error);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "I'm having a little trouble connecting right now. Please try again or reach out to us on WhatsApp!" 
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleWhatsApp = () => {
@@ -176,6 +203,20 @@ export const Chatbot = () => {
               )}
             </div>
           ))}
+          {isLoading && (
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center animate-pulse">
+                <Bot className="w-3 h-3 text-gold" />
+              </div>
+              <div className="bg-ink-soft border border-gold/15 p-3 rounded-2xl rounded-tl-none">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-gold/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 bg-gold/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 bg-gold/50 rounded-full animate-bounce" />
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={endRef} />
         </div>
 

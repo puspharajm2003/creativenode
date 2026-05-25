@@ -172,7 +172,7 @@ const Clients = () => {
 
       pdf.setTextColor(150, 150, 150);
       pdf.setFontSize(12);
-      pdf.text("hello@creativenode.in  |  @creativenode.in", pageW / 2, 370, { align: "center" });
+      pdf.text("@creativenode.in", pageW / 2, 370, { align: "center" });
 
       pdf.save(`creativenode-showcase-${Date.now()}.pdf`);
       toast.success("Gallery exported");
@@ -310,6 +310,7 @@ const Clients = () => {
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               EXPORT GALLERY
             </button>
+            <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
             <AuthNavButton className="hover:text-gold transition" />
           </div>
         </div>
@@ -420,7 +421,12 @@ const Clients = () => {
               <div className="reel-track flex items-center gap-4 md:gap-8 px-6 md:pl-12 md:pr-32 w-full md:w-auto overflow-x-auto md:overflow-visible snap-x snap-mandatory no-scrollbar will-change-transform pb-8 md:pb-0">
                 {list.length === 0 ? (
                   <div className="reel-card shrink-0 w-[260px] md:w-[420px] aspect-[4/5] poster-card flex items-center justify-center snap-center">
-                    <span className="font-serif-elegant italic text-cream/40">Coming soon</span>
+                    <div className="text-center px-6">
+                      <div className="font-display tracking-[0.2em] text-gold text-xs mb-2">NO APPROVED POSTERS YET</div>
+                      <p className="font-serif-elegant italic text-cream/55 text-sm">
+                        This client section is published only after real project creatives are reviewed and approved.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   list.map((p, i) => (
@@ -489,6 +495,11 @@ const Clients = () => {
         </div>
         <div className="mt-20 text-xs font-display tracking-[0.4em] text-cream/40">
           © CREATIVENODE · @creativenode.in · +91 6369278905
+        </div>
+        <div className="mt-4 flex items-center justify-center gap-5 text-[10px] font-display tracking-[0.2em] text-cream/50">
+          <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
+          <Link to="/privacy-policy" className="hover:text-gold transition">PRIVACY POLICY</Link>
+          <Link to="/editorial-policy" className="hover:text-gold transition">EDITORIAL POLICY</Link>
         </div>
       </section>
     </div>

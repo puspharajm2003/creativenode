@@ -73,6 +73,36 @@ const Admin = () => {
   /* Website URL input state */
   const [websiteUrlInput, setWebsiteUrlInput] = useState("");
 
+  const [lastRetryTime, setLastRetryTime] = useState<Record<string, number>>({});
+  const [timeTick, setTimeTick] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTick(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const parseRetryTimestamps = (msg: string): string[] => {
+    const matches = Array.from(msg.matchAll(/- WhatsApp Retry: (.*)/g));
+    return matches.map(match => match[1]);
+  };
+
+  const getSecondsLeft = (m: ContactMessage) => {
+    const localLast = lastRetryTime[m.id] || 0;
+    const timestamps = parseRetryTimestamps(m.message);
+    let dbLast = 0;
+    if (timestamps.length > 0) {
+      const lastString = timestamps[timestamps.length - 1];
+      dbLast = new Date(lastString).getTime();
+    }
+    const lastTime = Math.max(localLast, dbLast);
+    if (!lastTime) return 0;
+    const elapsed = Math.floor((timeTick - lastTime) / 1000);
+    const left = 60 - elapsed;
+    return left > 0 ? left : 0;
+  };
+
   const active = clients.find((c) => c.id === activeId);
   const activePosters = posters.filter((p) => p.client_id === activeId);
   const activeWebClient = clients.find((c) => c.id === activeWebsiteClientId);
@@ -178,7 +208,7 @@ const Admin = () => {
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.text("This is a confirmation of your interest. Final pricing may vary based on project scope.", 40, y);
-    pdf.text("Contact: +91 6369278905  |  hello@creativenode.in", 40, y + 16);
+    pdf.text("Contact: +91 6369278905", 40, y + 16);
 
     // Bottom gold line
     pdf.setDrawColor(212, 175, 55);
@@ -213,6 +243,12 @@ const Admin = () => {
   };
 
   const retryWhatsApp = async (m: ContactMessage) => {
+    const secondsLeft = getSecondsLeft(m);
+    if (secondsLeft > 0) {
+      toast.warning(`Please wait ${secondsLeft}s before retrying again.`);
+      return;
+    }
+
     const waTextMatch = m.message.match(/── WhatsApp Delivery Text ──\n([\s\S]*?)\n\n── WhatsApp Status ──/);
     if (!waTextMatch) return toast.error("Could not find WhatsApp text in record.");
     const waText = waTextMatch[1].trim();
@@ -228,14 +264,23 @@ const Admin = () => {
       newMessage += `\nRetry attempts: ${newRetries}`;
     }
 
-    newMessage = newMessage.replace(/Status: \w+/, "Status: FAILED");
+    if (newMessage.includes('Status:')) {
+      newMessage = newMessage.replace(/Status: \w+/, "Status: RETRIED");
+    } else {
+      newMessage += `\nStatus: RETRIED`;
+    }
+
+    const nowIso = new Date().toISOString();
+    newMessage += `\n- WhatsApp Retry: ${nowIso}`;
+
+    setLastRetryTime(prev => ({ ...prev, [m.id]: Date.now() }));
 
     const { error } = await supabase.from("contact_messages").update({ message: newMessage }).eq("id", m.id);
     if (error) return toast.error("Failed to update retry status.");
     
     setMessages(prev => prev.map(x => x.id === m.id ? { ...x, message: newMessage } : x));
     window.open(`https://wa.me/916369278905?text=${encodeURIComponent(waText)}`, "_blank");
-    toast.success("WhatsApp opened. Status marked as FAILED.");
+    toast.success("WhatsApp opened. Status marked as RETRIED.");
   };
 
   /* Edit website title */
@@ -905,16 +950,31 @@ const Admin = () => {
                         )}
                         <div className="flex justify-between items-center py-1">
                           <span>Current Status:</span>
-                          <span className={waStatus === 'FAILED' ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>{waStatus}</span>
+                          <span className={waStatus === 'FAILED' ? 'text-red-400 font-bold' : waStatus === 'RETRIED' ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>{waStatus}</span>
                         </div>
+                        
+                        {/* Dynamic timeline of retries */}
+                        {parseRetryTimestamps(m.message).map((t, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-1 border-t border-gold/5 pt-1">
+                            <span>WhatsApp Retry #{idx + 1}:</span>
+                            <span className="text-gold/90">{new Date(t).toLocaleString()}</span>
+                          </div>
+                        ))}
+
                         <div className="flex justify-between items-center border-t border-gold/10 pt-3 mt-1">
                           <span>Retry attempts:</span>
                           <span className="text-cream/90 font-bold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">{retryCount}</span>
                         </div>
                         <div className="flex gap-3 pt-4 border-t border-gold/10 mt-2">
-                          <button onClick={() => retryWhatsApp(m)} className="flex-1 flex justify-center items-center gap-2 px-3 py-2 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold font-display tracking-widest rounded hover:opacity-90 transition">
-                            <Phone className="w-3.5 h-3.5 text-ink" /> RETRY WHATSAPP
-                          </button>
+                          {getSecondsLeft(m) > 0 ? (
+                            <button disabled className="flex-1 flex justify-center items-center gap-2 px-3 py-2 bg-gold/10 border border-gold/20 text-gold/40 font-bold font-display tracking-widest rounded cursor-not-allowed">
+                              <Phone className="w-3.5 h-3.5" /> RETRY COOLDOWN ({getSecondsLeft(m)}s)
+                            </button>
+                          ) : (
+                            <button onClick={() => retryWhatsApp(m)} className="flex-1 flex justify-center items-center gap-2 px-3 py-2 bg-gradient-to-r from-gold-deep via-gold to-gold-bright text-ink font-bold font-display tracking-widest rounded hover:opacity-90 transition">
+                              <Phone className="w-3.5 h-3.5 text-ink" /> RETRY WHATSAPP
+                            </button>
+                          )}
                           <button onClick={() => downloadReceiptAdmin(m)} className="flex-1 flex justify-center items-center gap-2 px-3 py-2 border border-gold/40 text-gold hover:bg-gold/10 rounded font-display tracking-widest transition">
                             <Download className="w-3.5 h-3.5" /> RECEIPT PDF
                           </button>

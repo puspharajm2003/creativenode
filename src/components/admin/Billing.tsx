@@ -183,7 +183,7 @@ export const Billing = () => {
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text("hello@creativenode.in  ·  +91 6369278905  ·  @creativenode.in", W / 2, doc.internal.pageSize.getHeight() - 30, { align: "center" });
+    doc.text("+91 6369278905  ·  @creativenode.in", W / 2, doc.internal.pageSize.getHeight() - 30, { align: "center" });
     doc.save(`${i.invoice_number}.pdf`);
   };
 

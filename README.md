@@ -8,7 +8,7 @@
   <p>
     <a href="https://creativenode.in"><strong>Visit the Showcase</strong></a> ·
     <a href="https://creativenode.in/admin"><strong>Admin CRM</strong></a> ·
-    <a href="mailto:hello@creativenode.in"><strong>Contact</strong></a>
+    <a href="https://wa.me/916369278905"><strong>Contact</strong></a>
   </p>
 </div>
 

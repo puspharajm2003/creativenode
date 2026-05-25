@@ -147,6 +147,7 @@ const Landing = () => {
                 <Link to="/websites" className="px-5 py-3 hover:bg-gold/10 hover:text-gold transition tracking-[0.2em]">WEBSITES</Link>
               </div>
             </div>
+            <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
             <AuthNavButton className="px-3 py-1.5 border border-gold/40 hover:border-gold hover:text-gold rounded" />
           </div>
         </div>
@@ -485,9 +486,6 @@ const Landing = () => {
               Tell us about your project and we'll reply with a quote within 24 hours.
             </p>
             <div className="mt-10 space-y-4 text-cream/80">
-              <a href="mailto:hello@creativenode.in" className="flex items-center gap-3 hover:text-gold transition">
-                <Mail className="w-4 h-4 text-gold" /> hello@creativenode.in
-              </a>
               <a href="https://wa.me/916369278905" className="flex items-center gap-3 hover:text-gold transition">
                 <Phone className="w-4 h-4 text-gold" /> +91 6369278905
               </a>
@@ -495,7 +493,7 @@ const Landing = () => {
                 <Instagram className="w-4 h-4 text-gold" /> @creativenode.in
               </a>
               <div className="flex items-center gap-3 text-cream/60">
-                <MapPin className="w-4 h-4 text-gold" /> Tamil Nadu, India
+                <MapPin className="w-4 h-4 text-gold" /> Puducherry, India
               </div>
             </div>
           </div>
@@ -510,6 +508,11 @@ const Landing = () => {
       <footer className="border-t border-gold/15 py-10 px-8 text-center">
         <div className="text-xs font-display tracking-[0.4em] text-cream/40">
           © {new Date().getFullYear()} CREATIVENODE · DESIGN. BUILD. INNOVATE.
+        </div>
+        <div className="mt-4 flex items-center justify-center gap-5 text-[10px] font-display tracking-[0.2em] text-cream/50">
+          <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
+          <Link to="/privacy-policy" className="hover:text-gold transition">PRIVACY POLICY</Link>
+          <Link to="/editorial-policy" className="hover:text-gold transition">EDITORIAL POLICY</Link>
         </div>
       </footer>
 

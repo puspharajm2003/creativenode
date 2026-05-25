@@ -98,7 +98,7 @@ export const Slide10Contact = () => {
     y += 160;
     pdf.setTextColor(100, 100, 100); pdf.setFontSize(9); pdf.setFont("helvetica", "normal");
     pdf.text("This is a confirmation of your interest. Final pricing may vary.", 40, y);
-    pdf.text("Contact: +91 6369278905  |  hello@creativenode.in", 40, y + 16);
+    pdf.text("Contact: +91 6369278905", 40, y + 16);
     pdf.setDrawColor(212, 175, 55); pdf.setLineWidth(2); pdf.line(40, 810, w - 40, 810);
     return pdf;
   }, []);
@@ -128,7 +128,7 @@ export const Slide10Contact = () => {
     pdf.setTextColor(212, 175, 55); pdf.setFontSize(36);
     pdf.text("Start Today.", pw / 2, ph / 2, { align: "center" });
     pdf.setTextColor(200, 195, 180); pdf.setFontSize(14);
-    pdf.text("+91 6369278905  |  hello@creativenode.in", pw / 2, ph / 2 + 40, { align: "center" });
+    pdf.text("+91 6369278905", pw / 2, ph / 2 + 40, { align: "center" });
 
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);

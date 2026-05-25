@@ -194,7 +194,7 @@ const Websites = () => {
 
       pdf.setTextColor(150, 150, 150);
       pdf.setFontSize(12);
-      pdf.text("hello@creativenode.in  |  @creativenode.in", pageW / 2, 370, { align: "center" });
+      pdf.text("@creativenode.in", pageW / 2, 370, { align: "center" });
 
       pdf.save(`creativenode-showcase-${Date.now()}.pdf`);
       toast.success("Gallery exported");
@@ -335,6 +335,7 @@ const Websites = () => {
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               EXPORT GALLERY
             </button>
+            <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
             <AuthNavButton className="hover:text-gold transition" />
           </div>
         </div>
@@ -542,7 +543,12 @@ const Websites = () => {
               <div className="reel-track flex items-center gap-8 pl-12 pr-32 will-change-transform">
                 {list.length === 0 ? (
                   <div className="reel-card w-[600px] aspect-video poster-card flex items-center justify-center">
-                    <span className="font-serif-elegant italic text-cream/40">Coming soon</span>
+                    <div className="text-center px-8">
+                      <div className="font-display tracking-[0.2em] text-gold text-xs mb-2">NO APPROVED WEBSITE CASE YET</div>
+                      <p className="font-serif-elegant italic text-cream/55 text-sm">
+                        We publish this reel only with verified, client-approved web project screenshots and outcomes.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   list.map((p, i) => (
@@ -648,6 +654,11 @@ const Websites = () => {
         </div>
         <div className="mt-20 text-xs font-display tracking-[0.4em] text-cream/40">
           © CREATIVENODE · @creativenode.in · +91 6369278905
+        </div>
+        <div className="mt-4 flex items-center justify-center gap-5 text-[10px] font-display tracking-[0.2em] text-cream/50">
+          <Link to="/blog" className="hover:text-gold transition">BLOG</Link>
+          <Link to="/privacy-policy" className="hover:text-gold transition">PRIVACY POLICY</Link>
+          <Link to="/editorial-policy" className="hover:text-gold transition">EDITORIAL POLICY</Link>
         </div>
       </section>
 
